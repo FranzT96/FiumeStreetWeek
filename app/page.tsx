@@ -44,6 +44,7 @@ export default function Home() {
   }, []);
 
   const closeModal = () => setModal({ ...modal, isOpen: false });
+  const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
   // --- SCORE LOGIC (OPTIMISTIC) ---
   const updateScore = async (gameId: number, teamType: 'home' | 'away', pointsToAdd: number, currentScore: number) => {
@@ -53,10 +54,19 @@ export default function Home() {
     await supabase.from('games').update({ [field]: newScore }).eq('id', gameId);
   };
 
-  // --- STATUS LOGIC (FINISH / REOPEN) ---
+  // --- STATUS LOGIC (FINISH / REOPEN / START) ---
   const updateStatus = async (gameId: number, newStatus: string) => {
     const game = games.find(g => g.id === gameId);
     if (!game) return;
+
+    // CONTROLLO LIMITE 2 PARTITE LIVE
+    if (newStatus === 'in_corso' && game.status !== 'in_corso') {
+      const liveCount = games.filter(g => g.status === 'in_corso').length;
+      if (liveCount >= 2) {
+        showAlert("Limite Raggiunto", "Ci sono già 2 partite in corso. Chiudine una prima di avviarne un'altra.");
+        return;
+      }
+    }
 
     if (newStatus === 'finita' && game.status !== 'finita') {
       const homeWon = game.home_score > game.away_score;
@@ -138,6 +148,7 @@ export default function Home() {
 
   const liveGames = games.filter(g => g.status === 'in_corso').slice(0, 2);
   const nextGames = games.filter(g => g.status === 'programmata').slice(0, 2);
+  const activeLiveGamesCount = games.filter(g => g.status === 'in_corso').length;
 
   return (
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24">
@@ -164,7 +175,7 @@ export default function Home() {
                 {liveGames.length === 0 ? (
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
                 ) : liveGames.map(game => (
-                    <div key={game.id} className="bg-slate-900 border-2 border-cyan-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]">
+                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]">
                       <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
                       <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
@@ -194,18 +205,41 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- GIRONI E CALENDARIO (OMESSI PER BREVITÀ, RIMANGONO UGUALI) --- */}
+        {/* --- GIRONI --- */}
         {activeTab === 'gironi' && (
           <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
             {groups.map((group) => (
               <div key={group} className="bg-slate-900 rounded-2xl border-4 border-cyan-500 shadow-[6px_6px_0px_0px_rgba(249,115,22,1)] overflow-hidden">
                 <div className="bg-cyan-500 text-slate-900 p-2 text-center"><h3 className="text-xl font-black uppercase italic">GIRONE {group}</h3></div>
+                
                 <div className="p-3 space-y-2">
+                  {/* INTESTAZIONE COLONNE */}
+                  <div className="flex justify-between px-3 pb-1 text-[10px] font-black text-slate-400 border-b border-slate-700/50">
+                    <div className="w-1/2">SQUADRA</div>
+                    <div className="flex w-1/2 justify-end gap-2 font-mono text-center">
+                      <span className="w-4" title="Vinte">V</span>
+                      <span className="w-4" title="Perse">P</span>
+                      <span className="w-6" title="Punti Fatti">PF</span>
+                      <span className="w-6" title="Punti Subiti">PS</span>
+                      <span className="w-6 text-orange-500" title="Punti in Classifica">PT</span>
+                    </div>
+                  </div>
+
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
-                    <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer">
+                    <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors">
                       <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none">
-                        <div className="flex items-center gap-2 w-1/2"><span className="text-orange-500 font-black text-xs">{index + 1}.</span><span className="uppercase text-[10px] font-black truncate">{team.name}</span></div>
-                        <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono"><span className="text-slate-400 w-4">{team.wins}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-orange-400 w-6 font-black">{team.points}</span></div>
+                        <div className="flex items-center gap-2 w-1/2">
+                          <span className="text-orange-500 font-black text-xs">{index + 1}.</span>
+                          <span className="uppercase text-[10px] font-black truncate">{team.name}</span>
+                        </div>
+                        {/* VALORI SQUADRA */}
+                        <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono text-center items-center">
+                          <span className="text-slate-400 w-4">{team.wins}</span>
+                          <span className="text-slate-400 w-4">{team.losses}</span>
+                          <span className="text-cyan-500 w-6">{team.pf}</span>
+                          <span className="text-pink-500 w-6">{team.ps}</span>
+                          <span className="text-orange-400 w-6 font-black text-xs">{team.points}</span>
+                        </div>
                       </summary>
                       <div className="p-3 bg-slate-900/80 border-t border-slate-700">
                         <ul className="grid grid-cols-2 gap-2">
@@ -222,6 +256,7 @@ export default function Home() {
           </section>
         )}
 
+        {/* --- CALENDARIO --- */}
         {activeTab === 'calendario' && (
           <section className="animate-fade-in pt-4 bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
             {games.map((game, i) => (
@@ -245,18 +280,19 @@ export default function Home() {
           <section className="animate-fade-in space-y-6">
             <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic">Control Panel</h2>
             <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-              <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🔴 Live</button>
+              {/* PALLINO VERDE INSERITO QUI */}
+              <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
               <button onClick={() => setActiveAdminSubTab('orari')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
-            {/* LIVE CONTROL (NUOVO LAYOUT CARD) */}
+            {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-6 pb-20">
                 {games.map(game => (
                   <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all ${
                     game.status === 'in_corso' 
-                      ? 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]' 
+                      ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]' 
                       : 'border-slate-800 opacity-80'
                   }`}>
                     
@@ -264,7 +300,11 @@ export default function Home() {
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
                       {game.status === 'finita' && (
-                        <button onClick={() => updateStatus(game.id, 'in_corso')} className="text-[10px] text-pink-500 font-black uppercase hover:text-pink-400 flex items-center gap-1">
+                        <button 
+                          onClick={() => updateStatus(game.id, 'in_corso')} 
+                          disabled={activeLiveGamesCount >= 2}
+                          className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}
+                        >
                           <span>↺</span> Riapri
                         </button>
                       )}
@@ -278,7 +318,15 @@ export default function Home() {
                       </div>
                       
                       <div className="text-center w-1/3 px-1">
-                        {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Avvia</button>}
+                        {game.status === 'programmata' && (
+                          <button 
+                            onClick={() => updateStatus(game.id, 'in_corso')} 
+                            disabled={activeLiveGamesCount >= 2}
+                            className={`bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-opacity ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                          >
+                            Avvia
+                          </button>
+                        )}
                         {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
                         {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
                       </div>
@@ -390,7 +438,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- MODALI (OMESSE PER BREVITÀ, RIMANGONO UGUALI) --- */}
+      {/* --- MODALI (CREA / EDIT / CONFERMA) --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -435,7 +483,7 @@ export default function Home() {
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
             <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
             <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">No</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Si, Confermo</button></div>
+            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">No</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Ho Capito</button></div>
           </div>
         </div>
       )}
