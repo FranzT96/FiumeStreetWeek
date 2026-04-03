@@ -93,13 +93,13 @@ export default function Home() {
   const resetTournament = () => {
     setModal({
       isOpen: true,
-      title: "⚠️ ATTENZIONE NUCLEARE",
-      message: "Sei sicuro? Verranno CANCELLATE tutte le partite e AZZERATI i punti in classifica di tutte le squadre. Non si torna indietro!",
+      title: "⚠️ ATTENZIONE",
+      message: "Sei sicuro? Verranno azzerati tutti i punteggi e le classifiche torneranno a zero. Le squadre, i roster e il calendario dei match rimarranno intatti.",
       type: 'confirm',
       onConfirm: async () => {
         closeModal();
         setLoading(true);
-        await supabase.from('games').delete().neq('id', -1);
+        await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).neq('id', -1);
         await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1);
         await fetchData();
       }
@@ -298,7 +298,7 @@ export default function Home() {
                   </div>
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
                     <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors group">
-                      <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none">
+                      <summary className="p-3 font-bold text-slate-200 flex justify-between items-start list-none">
                         <div className="flex items-start gap-2 w-1/2">
                           <span className="text-orange-500 font-black text-xs shrink-0 mt-[2px]">{index + 1}.</span>
                           <span className="uppercase text-[10px] font-black truncate group-open:whitespace-normal group-open:break-words leading-tight">{team.name}</span>
@@ -359,7 +359,7 @@ export default function Home() {
             <div className="flex justify-between items-end border-b-2 border-orange-500 pb-2 pt-4">
               <h2 className="text-2xl font-black text-orange-500 uppercase italic m-0 leading-none">Control Panel</h2>
               {activeAdminSubTab === 'live' && (
-                <button onClick={resetTournament} className="bg-red-600/20 text-red-500 border border-red-500/50 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors flex items-center justify-center shadow-lg" title="Azzera tutto il Torneo">
+                <button onClick={resetTournament} className="bg-red-600/20 text-red-500 border border-red-500/50 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors flex items-center justify-center shadow-lg" title="Azzera Punteggi e Classifiche">
                   🗑️
                 </button>
               )}
@@ -583,7 +583,7 @@ export default function Home() {
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
             <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
             <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">No</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Ho Capito</button></div>
+            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Procedi</button></div>
           </div>
         </div>
       )}
