@@ -13,6 +13,10 @@ export default function Home() {
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A' });
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
   const [editingPlayer, setEditingPlayer] = useState<{ id: number, name: string } | null>(null);
+  
+  // Stato per l'editing della partita (Popup orari/campo)
+  const [gameToEdit, setGameToEdit] = useState<any | null>(null);
+
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
 
   const supabase = createClient();
@@ -67,13 +71,13 @@ export default function Home() {
     fetchData();
   };
 
-  const saveMatchTime = async (gameId: number, newTime: string) => {
-    await supabase.from('games').update({ match_time: newTime }).eq('id', gameId);
-    fetchData();
-  };
-
-  const updateCourt = async (gameId: number, newCourt: string) => {
-    await supabase.from('games').update({ court: newCourt }).eq('id', gameId);
+  const saveQuickEdit = async () => {
+    if (!gameToEdit) return;
+    await supabase.from('games').update({ 
+      match_time: gameToEdit.match_time, 
+      court: gameToEdit.court 
+    }).eq('id', gameToEdit.id);
+    setGameToEdit(null);
     fetchData();
   };
 
@@ -85,6 +89,7 @@ export default function Home() {
   };
 
   const deleteGame = (id: number) => {
+    setGameToEdit(null);
     showConfirm("Elimina Partita", "Sicuro di voler cancellare questo match?", async () => {
       await supabase.from('games').delete().eq('id', id); fetchData(); closeModal();
     });
@@ -130,7 +135,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- VISTE PUBBLICHE --- */}
+        {/* --- VISTE PUBBLICHE (Home, Gironi, Calendario) --- */}
         {activeTab === 'home' && (
           <section className="animate-fade-in space-y-8">
             <div>
@@ -138,23 +143,26 @@ export default function Home() {
                 <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now
               </h2>
               {liveGames.length === 0 ? (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center"><p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nessun match in corso</p></div>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center shadow-inner">
+                  <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nessun match in corso</p>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {liveGames.map(game => (
                     <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]">
-                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 uppercase font-bold mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
-                      <div className="text-center w-1/5 text-pink-500 font-black text-lg animate-pulse">VS</div>
+                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase tracking-widest">CAMPO {game.court}</div>
+                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] sm:text-sm text-cyan-400 uppercase font-bold mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
+                      <div className="text-center w-1/5 text-pink-500 font-black text-lg sm:text-xl animate-pulse italic mt-2">VS</div>
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] sm:text-sm text-cyan-400 uppercase font-bold mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
+
             {nextGames.length > 0 && (
               <div>
-                <h2 className="text-lg font-black text-slate-500 uppercase mb-4 tracking-widest">🔜 Prossime Partite</h2>
+                <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest">🔜 Prossime Partite</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {nextGames.map(game => (
                     <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-2 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
@@ -191,9 +199,9 @@ export default function Home() {
                       <div className="p-3 bg-slate-900/80 border-t border-slate-700">
                         <ul className="grid grid-cols-2 gap-2">
                           {team.players.map((player: any) => (
-                            <li key={player.id} className="text-slate-300 flex items-center gap-1.5 text-[10px] font-bold">
+                            <li key={player.id} className="text-slate-300 flex items-center gap-1.5 text-[10px] font-bold truncate uppercase">
                               <span className="bg-pink-500 w-1.5 h-1.5 rounded-full shadow-[0_0_5px_rgba(236,72,153,0.8)]"></span>
-                              <span className="uppercase truncate">{player.name}</span>
+                              {player.name}
                             </li>
                           ))}
                         </ul>
@@ -214,11 +222,11 @@ export default function Home() {
                 <div className="text-right font-black text-cyan-400 text-[10px] uppercase truncate">{game.home_team.name}</div>
                 <div className="flex justify-center items-center">
                   {game.status === 'finita' ? (
-                    <div className="bg-slate-800 border-2 border-slate-700 px-2 py-1 rounded text-white font-black text-xs">{game.home_score} - {game.away_score}</div>
+                    <div className="bg-slate-800 border-2 border-slate-700 px-2 py-1 rounded text-white font-black text-xs shadow-lg">{game.home_score} - {game.away_score}</div>
                   ) : <div className="text-slate-600 font-black italic text-[10px]">VS</div>}
                 </div>
                 <div className="text-left font-black text-cyan-400 text-[10px] uppercase truncate">{game.away_team.name}</div>
-                <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
               </div>
             ))}
           </section>
@@ -234,17 +242,18 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
+            {/* LIVE SUBTAB */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-4">
                 {games.map(game => (
                   <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 ${game.status === 'in_corso' ? 'border-pink-500' : 'border-slate-800'}`}>
                     <div className="flex justify-between items-center bg-black p-3 rounded-lg mb-4 relative">
-                      <span className="absolute top-1 left-2 text-[8px] text-slate-600 font-mono">{game.match_time} | CAMPO {game.court}</span>
+                      <span className="absolute top-1 left-2 text-[8px] text-slate-600 font-mono tracking-widest">{game.match_time} | CAMPO {game.court}</span>
                       <div className="text-center w-1/3 mt-2"><p className="text-[9px] text-slate-500 uppercase truncate">{game.home_team.name}</p><p className="text-4xl font-black text-orange-500">{game.home_score}</p></div>
                       <div className="text-center w-1/3 mt-2">
                         <span className="text-[8px] font-black text-cyan-400 block mb-1 uppercase tracking-tighter">{game.status.replace('_', ' ')}</span>
                         {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-orange-500 text-black text-[9px] font-black px-4 py-1.5 rounded w-full">AVVIA</button>}
-                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-1.5 rounded w-full">CHIUDI</button>}
+                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-1.5 rounded w-full shadow-lg shadow-pink-500/20">CHIUDI</button>}
                       </div>
                       <div className="text-center w-1/3 mt-2"><p className="text-[9px] text-slate-500 uppercase truncate">{game.away_team.name}</p><p className="text-4xl font-black text-orange-500">{game.away_score}</p></div>
                     </div>
@@ -269,39 +278,51 @@ export default function Home() {
               </div>
             )}
 
+            {/* ORARI SUBTAB (RIPULITO) */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4">
                 <div className="bg-slate-900 p-4 rounded-xl border-2 border-cyan-500">
-                  <h3 className="text-[10px] font-black uppercase mb-3 text-cyan-400">➕ Nuova Partita</h3>
+                  <h3 className="text-[10px] font-black uppercase mb-3 text-cyan-400 tracking-widest flex items-center gap-2">➕ Nuova Partita</h3>
                   <div className="grid grid-cols-2 gap-2 mb-2">
-                    <select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-2 rounded text-xs border border-slate-800">
+                    <select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-2 rounded text-xs border border-slate-800 outline-none focus:border-cyan-500">
                       <option value="">Casa...</option>
                       {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-                    <select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-2 rounded text-xs border border-slate-800">
+                    <select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-2 rounded text-xs border border-slate-800 outline-none focus:border-cyan-500">
                       <option value="">Ospiti...</option>
                       {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                   </div>
                   <div className="flex gap-2">
-                    <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-2 rounded text-xs flex-1 border border-slate-800" />
-                    <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-2 rounded text-xs w-16 border border-slate-800">
+                    <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-2 rounded text-xs flex-1 border border-slate-800 outline-none focus:border-cyan-500" />
+                    <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-2 rounded text-xs w-16 border border-slate-800 outline-none focus:border-cyan-500">
                       <option value="A">A</option><option value="B">B</option>
                     </select>
-                    <button onClick={createGame} className="bg-cyan-500 text-black font-black px-4 rounded text-xs uppercase">Crea</button>
+                    <button onClick={createGame} className="bg-cyan-500 text-black font-black px-4 rounded text-xs uppercase tracking-tighter">Crea</button>
                   </div>
                 </div>
-                <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800">
+                
+                <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
                   {games.map(game => (
-                    <div key={game.id} className="flex justify-between items-center p-3 border-b border-slate-800 last:border-0">
-                      <div className="flex items-center gap-2 flex-1">
-                        <input type="time" value={game.match_time || ''} onChange={(e) => saveMatchTime(game.id, e.target.value)} className="bg-black text-cyan-400 p-1 rounded text-[10px] font-mono border border-slate-700 w-16" />
-                        <select value={game.court || 'A'} onChange={(e) => updateCourt(game.id, e.target.value)} className="bg-black text-orange-500 p-1 rounded text-[10px] font-black border border-slate-700">
-                          <option value="A">A</option><option value="B">B</option>
-                        </select>
-                        <span className="text-[9px] font-black uppercase text-slate-400 truncate">{game.home_team.name} vs {game.away_team.name}</span>
-                      </div>
-                      <button onClick={() => deleteGame(game.id)} className="text-slate-600 p-1 ml-2">❌</button>
+                    <div key={game.id} className="grid grid-cols-[45px_1fr_30px_30px] items-center gap-2 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
+                      {/* ORARIO FISSO */}
+                      <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
+                      
+                      {/* SQUADRE (CON WRAP) */}
+                      <span className="text-[10px] font-black uppercase text-slate-200 break-words leading-tight px-1">
+                        {game.home_team.name} <span className="text-slate-600 italic">vs</span> {game.away_team.name}
+                      </span>
+                      
+                      {/* CAMPO FISSO */}
+                      <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
+                      
+                      {/* TASTO EDIT UNICO */}
+                      <button 
+                        onClick={() => setGameToEdit({ ...game })} 
+                        className="text-slate-500 hover:text-cyan-400 p-2 text-sm transition-colors text-right"
+                      >
+                        ✏️
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -312,7 +333,7 @@ export default function Home() {
               <div className="grid grid-cols-1 gap-6">
                 {teams.map(team => (
                   <div key={team.id} className="bg-slate-900 rounded-xl border-2 border-orange-500/30 p-4">
-                    <h3 className="text-[10px] font-black text-white uppercase mb-3 flex justify-between">{team.name} <span className="text-orange-500">GIRONE {team.group_name}</span></h3>
+                    <h3 className="text-[10px] font-black text-white uppercase mb-3 flex justify-between">{team.name} <span className="text-orange-500 tracking-widest">GIRONE {team.group_name}</span></h3>
                     <ul className="mb-4 space-y-1">
                       {team.players.map((p: any) => (
                         <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
@@ -322,14 +343,14 @@ export default function Home() {
                               <button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px]">OK</button>
                             </div>
                           ) : (
-                            <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500">❌</button></div></>
+                            <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500 transition-colors">❌</button></div></>
                           )}
                         </li>
                       ))}
                     </ul>
                     <div className="flex gap-1.5">
                       <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
-                      <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase">Aggiungi</button>
+                      <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter">Aggiungi</button>
                     </div>
                   </div>
                 ))}
@@ -342,22 +363,61 @@ export default function Home() {
       {/* --- NAVIGATION --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-lg mx-auto p-2">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/5 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl">🔥</span><span className="text-[8px] font-black uppercase italic">Live</span></button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/5 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl">📊</span><span className="text-[8px] font-black uppercase italic">Gironi</span></button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/5 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl">📅</span><span className="text-[8px] font-black uppercase italic">Orari</span></button>
-          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/5 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl">⚙️</span><span className="text-[8px] font-black uppercase italic">Admin</span></button>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/5 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest">Live</span></button>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/5 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest">Gironi</span></button>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/5 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest">Orari</span></button>
+          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/5 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest">Admin</span></button>
         </div>
       </nav>
 
-      {/* --- MODAL --- */}
+      {/* --- MODAL EDIT PARTITA (QUICK EDIT) --- */}
+      {gameToEdit && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2">Modifica Partita</h3>
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Orario</label>
+                <input 
+                  type="time" 
+                  value={gameToEdit.match_time} 
+                  onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })}
+                  className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Campo</label>
+                <select 
+                  value={gameToEdit.court} 
+                  onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })}
+                  className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500"
+                >
+                  <option value="A">Campo A</option>
+                  <option value="B">Campo B</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg">Salva Modifiche</button>
+              <div className="flex gap-2">
+                <button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px]">Elimina Partita</button>
+                <button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px]">Annulla</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL DI CONFERMA / ALERT --- */}
       {modal.isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-pink-500">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm">{modal.message}</p>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter">{modal.title}</h3>
+            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight">{modal.message}</p>
             <div className="flex justify-end gap-3">
-              {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-4 py-2 rounded-lg font-black uppercase text-xs">No</button>}
-              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-cyan-500 text-slate-900 px-4 py-2 rounded-lg font-black uppercase text-xs">Si</button>
+              {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px]">No</button>}
+              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg">Si, Vai</button>
             </div>
           </div>
         </div>
