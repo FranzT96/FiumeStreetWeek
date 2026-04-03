@@ -551,64 +551,78 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[80px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
             </div>
 
-            {/* LIVE CONTROL (ORDINATO CON IN CORSO -> PROGRAMMATE -> FINITE IN FONDO) */}
+            {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
-              <div className="grid grid-cols-1 gap-6 pb-20">
-                {adminLiveGames.map(game => (
-                  <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
-                    game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 
-                    game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-slate-700'
-                  }`}>
-                    <div className="flex justify-between items-center mb-3">
-                      <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
-                      {game.status === 'finita' && (
-                        <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}>
-                          <span>↺</span> Riapri
-                        </button>
-                      )}
-                    </div>
+              <div className="space-y-4 pb-20">
+                
+                <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 mb-6">
+                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>Qualifiche</button>
+                  <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>Finali</button>
+                </div>
 
-                    <div className="flex justify-between items-stretch bg-black p-3 rounded-lg mb-3">
-                      <div className="flex flex-col justify-between text-center w-[35%]">
-                        <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team?.name || 'TBD'}</p>
-                        <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
-                      </div>
-                      
-                      <div className="flex flex-col justify-center text-center w-[30%] px-1">
-                        {game.status === 'programmata' && (
-                          <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2 || (!game.home_team_id || !game.away_team_id)} className={`bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-opacity ${(activeLiveGamesCount >= 2 || !game.home_team_id || !game.away_team_id) ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                            Avvia
-                          </button>
+                <div className="grid grid-cols-1 gap-6">
+                  {(() => {
+                    const filteredLiveGames = adminLiveGames.filter(g => activeScheduleTab === 'qualifiche' ? (!g.stage || g.stage === 'girone') : (g.stage && g.stage !== 'girone'));
+
+                    if (filteredLiveGames.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun match in questa fase.</div>;
+
+                    return filteredLiveGames.map(game => (
+                      <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
+                        game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 
+                        game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-slate-700'
+                      }`}>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
+                          {game.status === 'finita' && (
+                            <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}>
+                              <span>↺</span> Riapri
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex justify-between items-stretch bg-black p-3 rounded-lg mb-3">
+                          <div className="flex flex-col justify-between text-center w-[35%]">
+                            <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team?.name || 'TBD'}</p>
+                            <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
+                          </div>
+                          
+                          <div className="flex flex-col justify-center text-center w-[30%] px-1">
+                            {game.status === 'programmata' && (
+                              <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2 || (!game.home_team_id || !game.away_team_id)} className={`bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-opacity ${(activeLiveGamesCount >= 2 || !game.home_team_id || !game.away_team_id) ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                Avvia
+                              </button>
+                            )}
+                            {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
+                            {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
+                          </div>
+
+                          <div className="flex flex-col justify-between text-center w-[35%]">
+                            <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team?.name || 'TBD'}</p>
+                            <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
+                          </div>
+                        </div>
+
+                        {game.status === 'in_corso' && (
+                          <div className="flex justify-between items-center w-full gap-2 mt-2">
+                            <div className="flex gap-1">
+                              <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
+                              <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
+                              <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
+                              <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                            </div>
+                            <span className="text-[10px] text-slate-600 font-black italic">VS</span>
+                            <div className="flex gap-1">
+                              <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
+                              <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
+                              <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
+                              <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                            </div>
+                          </div>
                         )}
-                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
-                        {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
                       </div>
-
-                      <div className="flex flex-col justify-between text-center w-[35%]">
-                        <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team?.name || 'TBD'}</p>
-                        <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
-                      </div>
-                    </div>
-
-                    {game.status === 'in_corso' && (
-                      <div className="flex justify-between items-center w-full gap-2 mt-2">
-                        <div className="flex gap-1">
-                          <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
-                          <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
-                          <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
-                          <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
-                        </div>
-                        <span className="text-[10px] text-slate-600 font-black italic">VS</span>
-                        <div className="flex gap-1">
-                          <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
-                          <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
-                          <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
-                          <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    ));
+                  })()}
+                </div>
               </div>
             )}
 
@@ -767,7 +781,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALI CREA/EDIT/CONFERMA --- */}
+      {/* --- MODALI CREA --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -777,9 +791,18 @@ export default function Home() {
                 <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
               </div>
-              <div className="flex gap-3">
-                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
-                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
+                  <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
+                  <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
@@ -802,9 +825,18 @@ export default function Home() {
                 <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Ospite</label><select value={gameToEdit.away_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, away_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
               </div>
 
-              <div className="flex gap-3 mt-4">
-                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
-                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
+                  <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
+                  <select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
