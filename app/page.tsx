@@ -14,6 +14,9 @@ export default function Home() {
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
   const [editingPlayer, setEditingPlayer] = useState<{ id: number, name: string } | null>(null);
   
+  // Stato per edit nome squadra
+  const [editingTeam, setEditingTeam] = useState<{ id: number, name: string } | null>(null);
+
   // Stati per le Modali Admin
   const [gameToEdit, setGameToEdit] = useState<any | null>(null);
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
@@ -91,6 +94,14 @@ export default function Home() {
     showConfirm("Elimina Partita", "Sicuro di voler cancellare questo match?", async () => {
       await supabase.from('games').delete().eq('id', id); fetchData(); closeModal();
     });
+  };
+
+  // --- LOGICA ROSTER / TEAMS ---
+  const saveTeamName = async () => {
+    if (!editingTeam || !editingTeam.name) return;
+    await supabase.from('teams').update({ name: editingTeam.name.toUpperCase() }).eq('id', editingTeam.id);
+    setEditingTeam(null);
+    fetchData();
   };
 
   const addPlayer = async (teamId: number) => {
@@ -232,13 +243,14 @@ export default function Home() {
         {/* --- VISTA ADMIN --- */}
         {activeTab === 'admin' && (
           <section className="animate-fade-in space-y-6">
-            <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2">Control Panel</h2>
+            <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic">Control Panel</h2>
             <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
               <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🔴 Live</button>
               <button onClick={() => setActiveAdminSubTab('orari')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
+            {/* LIVE SUBTAB */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-4">
                 {games.map(game => (
@@ -274,18 +286,10 @@ export default function Home() {
               </div>
             )}
 
-            {/* ORARI SUBTAB (CON PULSANTE NUOVA PARTITA) */}
+            {/* ORARI SUBTAB */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4">
-                {/* PULSANTE CREAZIONE (PULITO) */}
-                <button 
-                  onClick={() => setIsNewGameModalOpen(true)}
-                  className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs hover:bg-cyan-500/10 transition-all flex items-center justify-center gap-2 shadow-lg"
-                >
-                  <span className="text-base">➕</span> Nuova Partita
-                </button>
-                
-                {/* LISTA PARTITE */}
+                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs hover:bg-cyan-500/10 transition-all flex items-center justify-center gap-2 shadow-lg">➕ Nuova Partita</button>
                 <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
                   {games.map(game => (
                     <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
@@ -301,28 +305,55 @@ export default function Home() {
               </div>
             )}
 
+            {/* ROSTER SUBTAB (NUOVO LAYOUT A GIRONI) */}
             {activeAdminSubTab === 'roster' && (
-              <div className="grid grid-cols-1 gap-6">
-                {teams.map(team => (
-                  <div key={team.id} className="bg-slate-900 rounded-xl border-2 border-orange-500/30 p-4">
-                    <h3 className="text-[10px] font-black text-white uppercase mb-3 flex justify-between">{team.name} <span className="text-orange-500 tracking-widest">GIRONE {team.group_name}</span></h3>
-                    <ul className="mb-4 space-y-1">
-                      {team.players.map((p: any) => (
-                        <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
-                          {editingPlayer?.id === p.id ? (
-                            <div className="flex-1 flex gap-1">
-                              <input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none" autoFocus />
-                              <button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px]">OK</button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+                {groups.map((group) => (
+                  <div key={group} className="bg-slate-900 rounded-2xl border-2 border-slate-800 overflow-hidden shadow-xl">
+                    <div className="bg-slate-800/50 p-2 text-center border-b border-slate-700">
+                      <h3 className="text-xs font-black uppercase text-orange-500 tracking-widest">Girone {group}</h3>
+                    </div>
+                    <div className="p-2 space-y-2">
+                      {teams.filter(t => t.group_name === group).map((team) => (
+                        <details key={team.id} className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden group">
+                          <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none cursor-pointer hover:bg-slate-800/50 transition-all">
+                            {editingTeam?.id === team.id ? (
+                              <div className="flex gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                                <input value={editingTeam.name} onChange={(e) => setEditingTeam({...editingTeam, name: e.target.value})} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none" autoFocus />
+                                <button onClick={saveTeamName} className="bg-cyan-500 text-black px-3 rounded text-[9px] font-black uppercase">Ok</button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between w-full">
+                                <span className="uppercase text-[10px] font-black tracking-tight">{team.name}</span>
+                                <button onClick={(e) => { e.preventDefault(); setEditingTeam({id: team.id, name: team.name}); }} className="text-slate-500 hover:text-cyan-400 text-xs">✏️</button>
+                              </div>
+                            )}
+                          </summary>
+                          
+                          <div className="p-3 bg-black/20 border-t border-slate-700/50 space-y-3">
+                            {/* Lista Giocatori */}
+                            <ul className="space-y-1">
+                              {team.players.map((p: any) => (
+                                <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
+                                  {editingPlayer?.id === p.id ? (
+                                    <div className="flex-1 flex gap-1">
+                                      <input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none" autoFocus />
+                                      <button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px]">Ok</button>
+                                    </div>
+                                  ) : (
+                                    <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500">❌</button></div></>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                            {/* Add Player Input */}
+                            <div className="flex gap-1.5 pt-2">
+                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
+                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter">Aggiungi</button>
                             </div>
-                          ) : (
-                            <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500 transition-colors">❌</button></div></>
-                          )}
-                        </li>
+                          </div>
+                        </details>
                       ))}
-                    </ul>
-                    <div className="flex gap-1.5">
-                      <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
-                      <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter">Aggiungi</button>
                     </div>
                   </div>
                 ))}
@@ -335,10 +366,10 @@ export default function Home() {
       {/* --- NAVIGATION --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-lg mx-auto p-2">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/5 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest">Live</span></button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/5 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest">Gironi</span></button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/5 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest">Orari</span></button>
-          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/5 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest">Admin</span></button>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/4 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest">Live</span></button>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/4 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest">Gironi</span></button>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/4 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest">Orari</span></button>
+          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest">Admin</span></button>
         </div>
       </nav>
 
