@@ -14,9 +14,9 @@ export default function Home() {
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
   const [editingPlayer, setEditingPlayer] = useState<{ id: number, name: string } | null>(null);
   
-  // Stato per l'editing della partita (Popup orari/campo)
+  // Stati per le Modali Admin
   const [gameToEdit, setGameToEdit] = useState<any | null>(null);
-
+  const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
 
   const supabase = createClient();
@@ -73,10 +73,7 @@ export default function Home() {
 
   const saveQuickEdit = async () => {
     if (!gameToEdit) return;
-    await supabase.from('games').update({ 
-      match_time: gameToEdit.match_time, 
-      court: gameToEdit.court 
-    }).eq('id', gameToEdit.id);
+    await supabase.from('games').update({ match_time: gameToEdit.match_time, court: gameToEdit.court }).eq('id', gameToEdit.id);
     setGameToEdit(null);
     fetchData();
   };
@@ -84,7 +81,8 @@ export default function Home() {
   const createGame = async () => {
     if (!newGame.home_id || !newGame.away_id) return showAlert("Attenzione", "Seleziona entrambe le squadre!");
     await supabase.from('games').insert({ home_team_id: parseInt(newGame.home_id), away_team_id: parseInt(newGame.away_id), match_time: newGame.time, court: newGame.court, status: 'programmata' });
-    setNewGame({ ...newGame, home_id: '', away_id: '' });
+    setNewGame({ home_id: '', away_id: '', time: '18:00', court: 'A' });
+    setIsNewGameModalOpen(false);
     fetchData();
   };
 
@@ -128,14 +126,14 @@ export default function Home() {
         {activeTab !== 'admin' && (
           <div className="text-center mb-8 pt-4 animate-fade-in">
             <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter transform -skew-x-6 leading-[0.85]">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-cyan-600 drop-shadow-lg block italic">FIUME</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-cyan-600 drop-shadow-lg block italic tracking-tighter">FIUME</span>
               <span className="text-orange-500 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] block mt-2">STREET WEEK</span>
             </h1>
             <p className="mt-4 text-pink-500 font-black tracking-[0.3em] text-2xl">2026</p>
           </div>
         )}
 
-        {/* --- VISTE PUBBLICHE (Home, Gironi, Calendario) --- */}
+        {/* --- VISTE PUBBLICHE --- */}
         {activeTab === 'home' && (
           <section className="animate-fade-in space-y-8">
             <div>
@@ -159,7 +157,6 @@ export default function Home() {
                 </div>
               )}
             </div>
-
             {nextGames.length > 0 && (
               <div>
                 <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest">🔜 Prossime Partite</h2>
@@ -242,7 +239,6 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
-            {/* LIVE SUBTAB */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-4">
                 {games.map(game => (
@@ -278,51 +274,27 @@ export default function Home() {
               </div>
             )}
 
-            {/* ORARI SUBTAB (RIPULITO) */}
+            {/* ORARI SUBTAB (CON PULSANTE NUOVA PARTITA) */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4">
-                <div className="bg-slate-900 p-4 rounded-xl border-2 border-cyan-500">
-                  <h3 className="text-[10px] font-black uppercase mb-3 text-cyan-400 tracking-widest flex items-center gap-2">➕ Nuova Partita</h3>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-2 rounded text-xs border border-slate-800 outline-none focus:border-cyan-500">
-                      <option value="">Casa...</option>
-                      {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                    <select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-2 rounded text-xs border border-slate-800 outline-none focus:border-cyan-500">
-                      <option value="">Ospiti...</option>
-                      {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex gap-2">
-                    <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-2 rounded text-xs flex-1 border border-slate-800 outline-none focus:border-cyan-500" />
-                    <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-2 rounded text-xs w-16 border border-slate-800 outline-none focus:border-cyan-500">
-                      <option value="A">A</option><option value="B">B</option>
-                    </select>
-                    <button onClick={createGame} className="bg-cyan-500 text-black font-black px-4 rounded text-xs uppercase tracking-tighter">Crea</button>
-                  </div>
-                </div>
+                {/* PULSANTE CREAZIONE (PULITO) */}
+                <button 
+                  onClick={() => setIsNewGameModalOpen(true)}
+                  className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs hover:bg-cyan-500/10 transition-all flex items-center justify-center gap-2 shadow-lg"
+                >
+                  <span className="text-base">➕</span> Nuova Partita
+                </button>
                 
+                {/* LISTA PARTITE */}
                 <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
                   {games.map(game => (
-                    <div key={game.id} className="grid grid-cols-[45px_1fr_30px_30px] items-center gap-2 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
-                      {/* ORARIO FISSO */}
+                    <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
                       <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
-                      
-                      {/* SQUADRE (CON WRAP) */}
-                      <span className="text-[10px] font-black uppercase text-slate-200 break-words leading-tight px-1">
-                        {game.home_team.name} <span className="text-slate-600 italic">vs</span> {game.away_team.name}
-                      </span>
-                      
-                      {/* CAMPO FISSO */}
+                      <span className="text-[10px] font-black uppercase text-slate-200 text-right leading-tight break-words">{game.home_team.name}</span>
+                      <span className="text-[8px] text-slate-600 italic font-black px-1">VS</span>
+                      <span className="text-[10px] font-black uppercase text-slate-200 text-left leading-tight break-words">{game.away_team.name}</span>
                       <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
-                      
-                      {/* TASTO EDIT UNICO */}
-                      <button 
-                        onClick={() => setGameToEdit({ ...game })} 
-                        className="text-slate-500 hover:text-cyan-400 p-2 text-sm transition-colors text-right"
-                      >
-                        ✏️
-                      </button>
+                      <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right transition-all">✏️</button>
                     </div>
                   ))}
                 </div>
@@ -370,39 +342,72 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- MODAL EDIT PARTITA (QUICK EDIT) --- */}
+      {/* --- MODALE NUOVA PARTITA --- */}
+      {isNewGameModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest">Crea Partita</h3>
+            <div className="space-y-4 mb-8">
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Casa</label>
+                  <select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500">
+                    <option value="">Seleziona...</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Ospite</label>
+                  <select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500">
+                    <option value="">Seleziona...</option>
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Orario</label>
+                  <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Campo</label>
+                  <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500">
+                    <option value="A">Campo A</option><option value="B">Campo B</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg">Conferma e Crea</button>
+              <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px]">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE EDIT PARTITA (QUICK EDIT) --- */}
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2">Modifica Partita</h3>
-            <div className="space-y-4 mb-8">
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic">Modifica Partita</h3>
+            <div className="space-y-4 mb-8 text-center">
+              <p className="text-[10px] font-black uppercase text-slate-300">{gameToEdit.home_team.name} vs {gameToEdit.away_team.name}</p>
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Orario</label>
-                <input 
-                  type="time" 
-                  value={gameToEdit.match_time} 
-                  onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })}
-                  className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500"
-                />
+                <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500" />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Campo</label>
-                <select 
-                  value={gameToEdit.court} 
-                  onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })}
-                  className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500"
-                >
-                  <option value="A">Campo A</option>
-                  <option value="B">Campo B</option>
+                <select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500">
+                  <option value="A">Campo A</option><option value="B">Campo B</option>
                 </select>
               </div>
             </div>
-            
             <div className="flex flex-col gap-3">
               <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg">Salva Modifiche</button>
               <div className="flex gap-2">
-                <button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px]">Elimina Partita</button>
-                <button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px]">Annulla</button>
+                <button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px]">Elimina Match</button>
+                <button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px]">Chiudi</button>
               </div>
             </div>
           </div>
@@ -417,7 +422,7 @@ export default function Home() {
             <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight">{modal.message}</p>
             <div className="flex justify-end gap-3">
               {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px]">No</button>}
-              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg">Si, Vai</button>
+              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg">Si, Confermo</button>
             </div>
           </div>
         </div>
