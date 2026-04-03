@@ -43,33 +43,59 @@ export default function Home() {
     };
   }, []);
 
-  const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
-  const showConfirm = (title: string, message: string, onConfirm: () => void) => setModal({ isOpen: true, title, message, type: 'confirm', onConfirm });
   const closeModal = () => setModal({ ...modal, isOpen: false });
 
+  // --- REATTIVITÀ OTTIMISTICA PER IL PUNTEGGIO ---
   const updateScore = async (gameId: number, teamType: 'home' | 'away', pointsToAdd: number, currentScore: number) => {
     const field = teamType === 'home' ? 'home_score' : 'away_score';
     const newScore = Math.max(0, currentScore + pointsToAdd);
+
+    // Aggiornamento Locale Istantaneo (Optimistic UI)
+    setGames(prev => prev.map(g => g.id === gameId ? { ...g, [field]: newScore } : g));
+
+    // Aggiornamento DB
     await supabase.from('games').update({ [field]: newScore }).eq('id', gameId);
-    fetchData();
   };
 
+  // --- LOGICA CHIUSURA / RIAPERTURA ---
   const updateStatus = async (gameId: number, newStatus: string) => {
     const game = games.find(g => g.id === gameId);
     if (!game) return;
+
+    // Se stiamo CHIUDENDO la partita (Aggiunta punti)
     if (newStatus === 'finita' && game.status !== 'finita') {
       const homeWon = game.home_score > game.away_score;
       const awayWon = game.away_score > game.home_score;
       const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
+
       if (dbGame) {
         const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
         const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
+
         if (homeTeam && awayTeam) {
           await supabase.from('teams').update({ points: homeTeam.points + (homeWon ? 2 : 0), wins: homeTeam.wins + (homeWon ? 1 : 0), losses: homeTeam.losses + (awayWon ? 1 : 0), pf: homeTeam.pf + game.home_score, ps: homeTeam.ps + game.away_score }).eq('id', dbGame.home_team_id);
           await supabase.from('teams').update({ points: awayTeam.points + (awayWon ? 2 : 0), wins: awayTeam.wins + (awayWon ? 1 : 0), losses: awayTeam.losses + (homeWon ? 1 : 0), pf: awayTeam.pf + game.away_score, ps: awayTeam.ps + game.home_score }).eq('id', dbGame.away_team_id);
         }
       }
+    } 
+    
+    // Se stiamo RIAPERTO la partita (Storno punti)
+    if (newStatus === 'in_corso' && game.status === 'finita') {
+      const homeWon = game.home_score > game.away_score;
+      const awayWon = game.away_score > game.home_score;
+      const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
+
+      if (dbGame) {
+        const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
+        const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
+
+        if (homeTeam && awayTeam) {
+          await supabase.from('teams').update({ points: Math.max(0, homeTeam.points - (homeWon ? 2 : 0)), wins: Math.max(0, homeTeam.wins - (homeWon ? 1 : 0)), losses: Math.max(0, homeTeam.losses - (awayWon ? 1 : 0)), pf: Math.max(0, homeTeam.pf - game.home_score), ps: Math.max(0, homeTeam.ps - game.away_score) }).eq('id', dbGame.home_team_id);
+          await supabase.from('teams').update({ points: Math.max(0, awayTeam.points - (awayWon ? 2 : 0)), wins: Math.max(0, awayTeam.wins - (awayWon ? 1 : 0)), losses: Math.max(0, awayTeam.losses - (homeWon ? 1 : 0)), pf: Math.max(0, awayTeam.pf - game.away_score), ps: Math.max(0, awayTeam.ps - game.home_score) }).eq('id', dbGame.away_team_id);
+        }
+      }
     }
+
     await supabase.from('games').update({ status: newStatus }).eq('id', gameId);
     fetchData();
   };
@@ -82,7 +108,7 @@ export default function Home() {
   };
 
   const createGame = async () => {
-    if (!newGame.home_id || !newGame.away_id) return showAlert("Attenzione", "Seleziona entrambe le squadre!");
+    if (!newGame.home_id || !newGame.away_id) return;
     await supabase.from('games').insert({ home_team_id: parseInt(newGame.home_id), away_team_id: parseInt(newGame.away_id), match_time: newGame.time, court: newGame.court, status: 'programmata' });
     setNewGame({ home_id: '', away_id: '', time: '18:00', court: 'A' });
     setIsNewGameModalOpen(false);
@@ -91,9 +117,7 @@ export default function Home() {
 
   const deleteGame = (id: number) => {
     setGameToEdit(null);
-    showConfirm("Elimina Partita", "Sicuro di voler cancellare questo match?", async () => {
-      await supabase.from('games').delete().eq('id', id); fetchData(); closeModal();
-    });
+    setModal({ isOpen: true, title: "Elimina", message: "Cancellare questo match?", type: 'confirm', onConfirm: async () => { await supabase.from('games').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
   const saveTeamName = async () => {
@@ -118,16 +142,14 @@ export default function Home() {
   };
 
   const deletePlayer = (id: number) => {
-    showConfirm("Rimuovi", "Eliminare il giocatore?", async () => {
-      await supabase.from('players').delete().eq('id', id); fetchData(); closeModal();
-    });
+    setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-bold uppercase tracking-widest italic text-center px-4">Caricamento Live Data...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse">Live Sync...</div>;
 
   const liveGames = games.filter(g => g.status === 'in_corso');
   const scheduledGames = games.filter(g => g.status === 'programmata');
-  const nextGames = scheduledGames.slice(0, 2);
+  const finishedGames = games.filter(g => g.status === 'finita');
 
   return (
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24">
@@ -136,7 +158,7 @@ export default function Home() {
         {activeTab !== 'admin' && (
           <div className="text-center mb-8 pt-4 animate-fade-in">
             <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter transform -skew-x-6 leading-[0.85]">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-cyan-600 drop-shadow-lg block italic tracking-tighter">FIUME</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-cyan-600 drop-shadow-lg block italic">FIUME</span>
               <span className="text-orange-500 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] block mt-2">STREET WEEK</span>
             </h1>
             <p className="mt-4 text-pink-500 font-black tracking-[0.3em] text-2xl">2026</p>
@@ -146,43 +168,19 @@ export default function Home() {
         {/* --- HOME --- */}
         {activeTab === 'home' && (
           <section className="animate-fade-in space-y-8">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-black text-pink-500 uppercase flex items-center gap-2 mb-4 border-b-2 border-slate-800 pb-2 italic tracking-widest">
-                <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now
-              </h2>
-              {liveGames.length === 0 ? (
-                <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center shadow-inner">
-                  <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nessun match in corso</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {liveGames.map(game => (
-                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]">
-                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase tracking-widest">CAMPO {game.court}</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] sm:text-sm text-cyan-400 uppercase font-bold mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
-                      <div className="text-center w-1/5 text-pink-500 font-black text-lg sm:text-xl animate-pulse italic mt-2">VS</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] sm:text-sm text-cyan-400 uppercase font-bold mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <h2 className="text-xl font-black text-pink-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic"><span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {liveGames.length === 0 ? <p className="text-slate-500 font-black uppercase text-xs italic tracking-widest p-4">Nessun match in corso...</p> : 
+                liveGames.map(game => (
+                  <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]">
+                    <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
+                    <div className="text-center w-2/5"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
+                    <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse">VS</div>
+                    <div className="text-center w-2/5"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
+                  </div>
+                ))
+              }
             </div>
-            {nextGames.length > 0 && (
-              <div>
-                <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossime Partite</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {nextGames.map(game => (
-                    <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-2 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-                      <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
-                      <div className="text-right font-bold text-slate-300 text-[10px] uppercase truncate">{game.home_team.name}</div>
-                      <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
-                      <div className="text-left font-bold text-slate-300 text-[10px] uppercase truncate">{game.away_team.name}</div>
-                      <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded">{game.court}</span></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </section>
         )}
 
@@ -192,25 +190,22 @@ export default function Home() {
             {groups.map((group) => (
               <div key={group} className="bg-slate-900 rounded-2xl border-4 border-cyan-500 shadow-[6px_6px_0px_0px_rgba(249,115,22,1)] overflow-hidden">
                 <div className="bg-cyan-500 text-slate-900 p-2 text-center"><h3 className="text-xl font-black uppercase italic">GIRONE {group}</h3></div>
-                <div className="p-3 flex flex-col gap-2">
+                <div className="p-3 space-y-2">
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
                     <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer">
                       <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none">
                         <div className="flex items-center gap-2 w-1/2">
                           <span className="text-orange-500 font-black text-xs">{index + 1}.</span>
-                          <span className="uppercase text-[10px] font-black truncate tracking-tighter">{team.name}</span>
+                          <span className="uppercase text-[10px] font-black truncate">{team.name}</span>
                         </div>
                         <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono">
-                          <span className="text-slate-400 w-4">{team.wins}</span><span className="text-slate-400 w-4">{team.losses}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-orange-400 w-6 font-black">{team.points}</span>
+                          <span className="text-slate-400 w-4">{team.wins}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-orange-400 w-6 font-black">{team.points}</span>
                         </div>
                       </summary>
                       <div className="p-3 bg-slate-900/80 border-t border-slate-700">
                         <ul className="grid grid-cols-2 gap-2">
                           {team.players.map((player: any) => (
-                            <li key={player.id} className="text-slate-300 flex items-center gap-1.5 text-[10px] font-bold truncate uppercase">
-                              <span className="bg-pink-500 w-1.5 h-1.5 rounded-full shadow-[0_0_5px_rgba(236,72,153,0.8)]"></span>
-                              {player.name}
-                            </li>
+                            <li key={player.id} className="text-slate-300 flex items-center gap-1.5 text-[10px] font-bold truncate uppercase"><span className="bg-pink-500 w-1 h-1 rounded-full"></span>{player.name}</li>
                           ))}
                         </ul>
                       </div>
@@ -222,26 +217,26 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- CALENDARIO --- */}
+        {/* --- CALENDARIO PUBBLICO --- */}
         {activeTab === 'calendario' && (
           <section className="animate-fade-in pt-4 bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
             {games.map((game, i) => (
               <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-2 p-4 ${i !== games.length - 1 ? 'border-b border-slate-800' : ''}`}>
                 <div className="font-mono font-black text-pink-500 text-xs">{game.match_time}</div>
-                <div className="text-right font-black text-cyan-400 text-[10px] uppercase truncate tracking-tighter">{game.home_team.name}</div>
+                <div className="text-right font-black text-cyan-400 text-[10px] uppercase truncate">{game.home_team.name}</div>
                 <div className="flex justify-center items-center">
                   {game.status === 'finita' ? (
-                    <div className="bg-slate-800 border-2 border-slate-700 px-2 py-1 rounded text-white font-black text-xs shadow-lg">{game.home_score} - {game.away_score}</div>
+                    <div className="bg-slate-800 border-2 border-slate-700 px-2 py-1 rounded text-white font-black text-xs">{game.home_score}-{game.away_score}</div>
                   ) : <div className="text-slate-600 font-black italic text-[10px]">VS</div>}
                 </div>
-                <div className="text-left font-black text-cyan-400 text-[10px] uppercase truncate tracking-tighter">{game.away_team.name}</div>
-                <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                <div className="text-left font-black text-cyan-400 text-[10px] uppercase truncate">{game.away_team.name}</div>
+                <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded">{game.court}</span></div>
               </div>
             ))}
           </section>
         )}
 
-        {/* --- ADMIN --- */}
+        {/* --- ADMIN AREA --- */}
         {activeTab === 'admin' && (
           <section className="animate-fade-in space-y-6">
             <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic">Control Panel</h2>
@@ -251,44 +246,59 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
+            {/* LIVE CONTROL (REATTIVO) */}
             {activeAdminSubTab === 'live' && (
-              <div className="grid grid-cols-1 gap-4">
-                {games.map(game => (
-                  <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 ${game.status === 'in_corso' ? 'border-pink-500' : 'border-slate-800'}`}>
-                    <div className="flex justify-between items-center bg-black p-3 rounded-lg mb-4 relative">
-                      <span className="absolute top-1 left-2 text-[8px] text-slate-600 font-mono tracking-widest">{game.match_time} | CAMPO {game.court}</span>
-                      <div className="text-center w-1/3 mt-2"><p className="text-[9px] text-slate-500 uppercase truncate">{game.home_team.name}</p><p className="text-4xl font-black text-orange-500">{game.home_score}</p></div>
-                      <div className="text-center w-1/3 mt-2">
-                        <span className="text-[8px] font-black text-cyan-400 block mb-1 uppercase tracking-tighter">{game.status.replace('_', ' ')}</span>
-                        {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-orange-500 text-black text-[9px] font-black px-4 py-1.5 rounded w-full tracking-widest font-black uppercase">AVVIA</button>}
-                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-1.5 rounded w-full shadow-lg shadow-pink-500/20 tracking-widest font-black uppercase">CHIUDI</button>}
+              <div className="grid grid-cols-1 gap-6 pb-20">
+                {games.filter(g => g.status !== 'programmata').map(game => (
+                  <div key={game.id} className={`bg-slate-900 p-4 rounded-2xl border-2 shadow-2xl ${game.status === 'in_corso' ? 'border-pink-500' : 'border-slate-800 opacity-60 grayscale-[0.5]'}`}>
+                    <div className="flex justify-between items-center bg-black p-4 rounded-xl mb-4 relative overflow-hidden">
+                      {game.status === 'finita' && <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10"><button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-white text-black font-black px-4 py-2 rounded-lg text-xs tracking-widest shadow-xl">RIAPRI MATCH 🔄</button></div>}
+                      <div className="text-center w-1/3"><p className="text-[9px] text-slate-500 uppercase truncate">{game.home_team.name}</p><p className="text-4xl font-black text-white">{game.home_score}</p></div>
+                      <div className="text-center w-1/3">
+                        <span className="text-[8px] font-black text-cyan-400 block mb-2 uppercase tracking-widest">{game.status.replace('_', ' ')}</span>
+                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-2 rounded-lg w-full shadow-lg shadow-pink-500/20">CHIUDI MATCH 🔒</button>}
                       </div>
-                      <div className="text-center w-1/3 mt-2"><p className="text-[9px] text-slate-500 uppercase truncate">{game.away_team.name}</p><p className="text-4xl font-black text-orange-500">{game.away_score}</p></div>
+                      <div className="text-center w-1/3"><p className="text-[9px] text-slate-500 uppercase truncate">{game.away_team.name}</p><p className="text-4xl font-black text-white">{game.away_score}</p></div>
                     </div>
                     {game.status === 'in_corso' && (
-                      <div className="flex justify-between gap-4">
-                        <div className="flex flex-wrap gap-1 w-1/2">
-                          <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="bg-slate-800 text-pink-500 font-black w-9 h-9 rounded text-xs">-1</button>
-                          <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="bg-slate-700 text-cyan-400 font-black w-9 h-9 rounded text-xs">+1</button>
-                          <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="bg-slate-700 text-cyan-400 font-black w-9 h-9 rounded text-xs">+2</button>
-                          <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="bg-slate-700 text-orange-500 font-black w-9 h-9 rounded text-xs">+3</button>
+                      <div className="flex justify-between gap-4 px-2">
+                        <div className="flex flex-wrap gap-2 w-1/2">
+                          <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">-1</button>
+                          <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+1</button>
+                          <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+2</button>
+                          <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="bg-orange-500/20 text-orange-400 border border-orange-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+3</button>
                         </div>
-                        <div className="flex flex-wrap gap-1 w-1/2 justify-end">
-                          <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="bg-slate-800 text-pink-500 font-black w-9 h-9 rounded text-xs">-1</button>
-                          <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="bg-slate-700 text-cyan-400 font-black w-9 h-9 rounded text-xs">+1</button>
-                          <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="bg-slate-700 text-cyan-400 font-black w-9 h-9 rounded text-xs">+2</button>
-                          <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="bg-slate-700 text-orange-500 font-black w-9 h-9 rounded text-xs">+3</button>
+                        <div className="flex flex-wrap gap-2 w-1/2 justify-end">
+                          <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">-1</button>
+                          <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+1</button>
+                          <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+2</button>
+                          <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="bg-orange-500/20 text-orange-400 border border-orange-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+3</button>
                         </div>
                       </div>
                     )}
                   </div>
                 ))}
+                {games.filter(g => g.status === 'programmata').length > 0 && (
+                  <div className="bg-slate-800/40 p-4 rounded-xl border border-dashed border-slate-700 text-center">
+                    <p className="text-slate-500 text-[10px] uppercase font-black mb-4 tracking-widest">Partite in attesa</p>
+                    <div className="space-y-2">
+                      {games.filter(g => g.status === 'programmata').map(g => (
+                        <button key={g.id} onClick={() => updateStatus(g.id, 'in_corso')} className="w-full bg-slate-900 p-3 rounded-lg flex justify-between items-center hover:bg-cyan-500 group transition-all">
+                          <span className="font-mono text-xs text-cyan-400 group-hover:text-black">{g.match_time}</span>
+                          <span className="text-[10px] font-black uppercase group-hover:text-black">{g.home_team.name} vs {g.away_team.name}</span>
+                          <span className="bg-orange-500 text-black text-[9px] px-2 py-1 rounded font-black">START</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
+            {/* ORARI ADMIN */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4">
-                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs hover:bg-cyan-500/10 transition-all flex items-center justify-center gap-2 shadow-lg tracking-widest font-black">➕ Nuova Partita</button>
+                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Partita</button>
                 <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
                   {games.map(game => (
                     <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
@@ -297,39 +307,30 @@ export default function Home() {
                       <span className="text-[8px] text-slate-600 italic font-black px-1">VS</span>
                       <span className="text-[10px] font-black uppercase text-slate-200 text-left leading-tight break-words tracking-tighter">{game.away_team.name}</span>
                       <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
-                      <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right transition-all">✏️</button>
+                      <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right">✏️</button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* ROSTER ADMIN */}
             {activeAdminSubTab === 'roster' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
                 {groups.map((group) => (
                   <div key={group} className="bg-slate-900 rounded-2xl border-2 border-slate-800 overflow-hidden shadow-xl">
-                    <div className="bg-slate-800/50 p-2 text-center border-b border-slate-700">
-                      <h3 className="text-xs font-black uppercase text-orange-500 tracking-widest italic tracking-widest">Girone {group}</h3>
-                    </div>
+                    <div className="bg-slate-800/50 p-2 text-center border-b border-slate-700"><h3 className="text-xs font-black uppercase text-orange-500 tracking-widest italic">Girone {group}</h3></div>
                     <div className="p-2 space-y-2">
                       {teams.filter(t => t.group_name === group).map((team) => (
                         <details key={team.id} className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden group">
                           <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none cursor-pointer hover:bg-slate-800/50 transition-all">
                             {editingTeam?.id === team.id ? (
                               <div className="flex gap-1 w-full" onClick={(e) => e.stopPropagation()}>
-                                <input 
-                                  value={editingTeam?.name || ''} 
-                                  onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} 
-                                  className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none font-black" 
-                                  autoFocus 
-                                />
+                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none font-black" autoFocus />
                                 <button onClick={saveTeamName} className="bg-cyan-500 text-black px-3 rounded text-[9px] font-black uppercase">Ok</button>
                               </div>
                             ) : (
-                              <div className="flex items-center justify-between w-full">
-                                <span className="uppercase text-[10px] font-black tracking-tight">{team.name}</span>
-                                <button onClick={(e) => { e.preventDefault(); setEditingTeam({id: team.id, name: team.name}); }} className="text-slate-500 hover:text-cyan-400 text-xs transition-colors p-1">✏️</button>
-                              </div>
+                              <div className="flex items-center justify-between w-full"><span className="uppercase text-[10px] font-black tracking-tight">{team.name}</span><button onClick={(e) => { e.preventDefault(); setEditingTeam({id: team.id, name: team.name}); }} className="text-slate-500 hover:text-cyan-400 text-xs p-1">✏️</button></div>
                             )}
                           </summary>
                           <div className="p-3 bg-black/20 border-t border-slate-700/50 space-y-3">
@@ -337,15 +338,7 @@ export default function Home() {
                               {team.players.map((p: any) => (
                                 <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
                                   {editingPlayer?.id === p.id ? (
-                                    <div className="flex-1 flex gap-1">
-                                      <input 
-                                        value={editingPlayer?.name || ''} 
-                                        onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} 
-                                        className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none font-black" 
-                                        autoFocus 
-                                      />
-                                      <button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase font-black">Ok</button>
-                                    </div>
+                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none font-black" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase font-black">Ok</button></div>
                                   ) : (
                                     <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500 transition-colors">❌</button></div></>
                                   )}
@@ -354,7 +347,7 @@ export default function Home() {
                             </ul>
                             <div className="flex gap-1.5 pt-2">
                               <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500 font-black tracking-tighter" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
-                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter shadow-md font-black">Aggiungi</button>
+                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter shadow-md">Aggiungi</button>
                             </div>
                           </div>
                         </details>
@@ -377,85 +370,54 @@ export default function Home() {
         </div>
       </nav>
 
+      {/* --- MODALE NUOVA PARTITA --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Crea Partita</h3>
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest">Crea Partita</h3>
             <div className="space-y-4 mb-8">
               <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label>
-                  <select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black">
-                    <option value="">Seleziona...</option>
-                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label>
-                  <select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black">
-                    <option value="">Seleziona...</option>
-                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
-                  <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
-                  <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
-                    <option value="A">Campo A</option><option value="B">Campo B</option>
-                  </select>
-                </div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Orario</label><input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Campo</label><select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
               <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-cyan-500/20 tracking-widest font-black">Conferma e Crea</button>
-              <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest font-black">Annulla</button>
+              <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest">Annulla</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* --- MODALE EDIT --- */}
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Modifica Partita</h3>
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest">Modifica Partita</h3>
             <div className="space-y-4 mb-8 text-center">
-              <p className="text-[10px] font-black uppercase text-slate-300 tracking-tighter font-black tracking-widest">{gameToEdit.home_team.name} vs {gameToEdit.away_team.name}</p>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
-                <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
-                <select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
-                  <option value="A">Campo A</option><option value="B">Campo B</option>
-                </select>
-              </div>
+              <p className="text-[10px] font-black uppercase text-slate-300 tracking-tighter">{gameToEdit.home_team.name} vs {gameToEdit.away_team.name}</p>
+              <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Orario</label><input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
+              <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Campo</label><select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
-              <div className="flex gap-2">
-                <button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina Match</button>
-                <button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button>
-              </div>
+              <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest">Salva Modifiche</button>
+              <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest">Elimina Match</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest">Chiudi</button></div>
             </div>
           </div>
         </div>
       )}
 
+      {/* --- MODALE CONFERMA --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-widest font-black">{modal.title}</h3>
             <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">
-              {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">No</button>}
-              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Si, Confermo</button>
-            </div>
+            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest">No</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest">Si, Confermo</button></div>
           </div>
         </div>
       )}
