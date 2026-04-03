@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase';
 
 export default function Home() {
@@ -18,6 +18,10 @@ export default function Home() {
   const [gameToEdit, setGameToEdit] = useState<any | null>(null);
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
+
+  // --- STATO E REF PER L'EASTER EGG ADMIN ---
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
   const groups = ['A', 'B', 'C', 'D'];
@@ -45,6 +49,21 @@ export default function Home() {
 
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
+
+  // --- LOGICA EASTER EGG (3 SECONDI) ---
+  const handlePointerDown = () => {
+    pressTimerRef.current = setTimeout(() => {
+      setIsAdminUnlocked(true);
+      setActiveTab('admin');
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(150); // Vibra per confermare lo sblocco!
+      }
+    }, 3000);
+  };
+
+  const handlePointerUp = () => {
+    if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+  };
 
   // --- SCORE LOGIC (OPTIMISTIC) ---
   const updateScore = async (gameId: number, teamType: 'home' | 'away', pointsToAdd: number, currentScore: number) => {
@@ -149,17 +168,25 @@ export default function Home() {
   const nextGames = games.filter(g => g.status === 'programmata').slice(0, 2);
   const activeLiveGamesCount = games.filter(g => g.status === 'in_corso').length;
 
+  // Gestione dinamica larghezza bottoni NAV (4 o 5)
+  const navItemClass = isAdminUnlocked ? "w-1/5" : "w-1/4";
+
   return (
-    <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24">
+    <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO INVECE DEL TESTO */}
+        {/* LOGO CON EASTER EGG (Invisibile nell'Admin per risparmiare spazio) */}
         {activeTab !== 'admin' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img 
               src="/icon.png" 
               alt="Fiume Street Week Logo" 
-              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" 
+              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain cursor-pointer active:scale-95 transition-transform" 
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              onContextMenu={(e) => e.preventDefault()} // Evita il menu "Salva immagine" su mobile
+              style={{ WebkitTouchCallout: 'none' }} // Disabilita pop-up su iOS
             />
           </div>
         )}
@@ -176,9 +203,7 @@ export default function Home() {
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
                 ) : liveGames.map(game => (
                     <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
-                      {/* ETICHETTA CAMPO CON SPIGOLO ARROTONDATO (rounded-tr-[10px]) */}
                       <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase">CAMPO {game.court}</div>
-                      
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
                       <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
@@ -263,7 +288,7 @@ export default function Home() {
         )}
 
         {/* --- ADMIN AREA --- */}
-        {activeTab === 'admin' && (
+        {activeTab === 'admin' && isAdminUnlocked && (
           <section className="animate-fade-in space-y-6">
             <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic">Control Panel</h2>
             <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
@@ -343,7 +368,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* ORARI E ROSTER (OMESSI PER BREVITÀ, RIMANGONO IDENTICI ALLA VERSIONE PRECEDENTE) */}
+            {/* ORARI ADMIN */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4 pb-20">
                 <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Partita</button>
@@ -362,6 +387,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* ROSTER ADMIN */}
             {activeAdminSubTab === 'roster' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                 {groups.map((group) => (
@@ -408,16 +434,21 @@ export default function Home() {
         )}
       </div>
 
+      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-lg mx-auto p-2">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/4 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Live</span></button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/4 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Gironi</span></button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/4 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Orari</span></button>
-          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white font-black">Admin</span></button>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center ${navItemClass} ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Live</span></button>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center ${navItemClass} ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Gironi</span></button>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center ${navItemClass} ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Orari</span></button>
+          
+          {/* APPARE SOLO SE SBLOCCATO */}
+          {isAdminUnlocked && (
+            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/5 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'} animate-fade-in`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white font-black">Admin</span></button>
+          )}
         </div>
       </nav>
 
-      {/* --- MODALI (CREA / EDIT / CONFERMA) --- */}
+      {/* --- MODALI --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
