@@ -136,7 +136,6 @@ export default function Home() {
 
   if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione...</div>;
 
-  // LOGICHE DI VISUALIZZAZIONE HOME
   const liveGames = games.filter(g => g.status === 'in_corso').slice(0, 2);
   const nextGames = games.filter(g => g.status === 'programmata').slice(0, 2);
 
@@ -165,7 +164,7 @@ export default function Home() {
                 {liveGames.length === 0 ? (
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
                 ) : liveGames.map(game => (
-                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]">
+                    <div key={game.id} className="bg-slate-900 border-2 border-cyan-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]">
                       <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
                       <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
@@ -195,7 +194,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- ALTRI TAB PUBBLICI (GIRONI, CALENDARIO) --- */}
+        {/* --- GIRONI E CALENDARIO (OMESSI PER BREVITÀ, RIMANGONO UGUALI) --- */}
         {activeTab === 'gironi' && (
           <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
             {groups.map((group) => (
@@ -251,54 +250,68 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
-            {/* LIVE CONTROL */}
+            {/* LIVE CONTROL (NUOVO LAYOUT CARD) */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-6 pb-20">
-                {games.filter(g => g.status !== 'programmata').map(game => (
-                  <div key={game.id} className={`bg-slate-900 p-4 rounded-2xl border-2 shadow-2xl ${game.status === 'in_corso' ? 'border-pink-500' : 'border-slate-800 opacity-60'}`}>
-                    <div className="flex justify-between items-center bg-black p-4 rounded-xl mb-4 relative overflow-hidden">
-                      {game.status === 'finita' && <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10"><button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-white text-black font-black px-4 py-2 rounded-lg text-xs tracking-widest shadow-xl">RIAPRI MATCH 🔄</button></div>}
-                      <div className="text-center w-1/3"><p className="text-[9px] text-slate-500 uppercase truncate">{game.home_team.name}</p><p className="text-4xl font-black text-white">{game.home_score}</p></div>
-                      <div className="text-center w-1/3">
-                        <span className="text-[8px] font-black text-cyan-400 block mb-2 uppercase tracking-widest">{game.status.replace('_', ' ')}</span>
-                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-2 rounded-lg w-full shadow-lg">CHIUDI MATCH 🔒</button>}
-                      </div>
-                      <div className="text-center w-1/3"><p className="text-[9px] text-slate-500 uppercase truncate">{game.away_team.name}</p><p className="text-4xl font-black text-white">{game.away_score}</p></div>
+                {games.map(game => (
+                  <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all ${
+                    game.status === 'in_corso' 
+                      ? 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]' 
+                      : 'border-slate-800 opacity-80'
+                  }`}>
+                    
+                    {/* Header Card */}
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
+                      {game.status === 'finita' && (
+                        <button onClick={() => updateStatus(game.id, 'in_corso')} className="text-[10px] text-pink-500 font-black uppercase hover:text-pink-400 flex items-center gap-1">
+                          <span>↺</span> Riapri
+                        </button>
+                      )}
                     </div>
+
+                    {/* Main Score Area */}
+                    <div className="flex justify-between items-center bg-black p-3 rounded-lg mb-3">
+                      <div className="text-center w-1/3">
+                        <p className={`text-[10px] font-black uppercase mb-1 truncate ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team.name}</p>
+                        <p className={`text-3xl font-black ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
+                      </div>
+                      
+                      <div className="text-center w-1/3 px-1">
+                        {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Avvia</button>}
+                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
+                        {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
+                      </div>
+
+                      <div className="text-center w-1/3">
+                        <p className={`text-[10px] font-black uppercase mb-1 truncate ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team.name}</p>
+                        <p className={`text-3xl font-black ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
+                      </div>
+                    </div>
+
+                    {/* Score Buttons (Only when Live) */}
                     {game.status === 'in_corso' && (
-                      <div className="flex flex-col gap-4">
-                        <div className="flex justify-between gap-1 items-center bg-slate-800/30 p-2 rounded-xl">
-                          <div className="flex gap-1.5">
-                            <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs">-1</button>
-                            <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+1</button>
-                            <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+2</button>
-                            <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+3</button>
-                          </div>
-                          <div className="flex gap-1.5">
-                            <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs">-1</button>
-                            <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+1</button>
-                            <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+2</button>
-                            <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+3</button>
-                          </div>
+                      <div className="flex justify-between items-center w-full gap-2 mt-2">
+                        {/* HOME BUTTONS */}
+                        <div className="flex gap-1">
+                          <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
+                          <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
+                          <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
+                          <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                        </div>
+                        {/* VS DIVIDER */}
+                        <span className="text-[10px] text-slate-600 font-black italic">VS</span>
+                        {/* AWAY BUTTONS */}
+                        <div className="flex gap-1">
+                          <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
+                          <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
+                          <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
+                          <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
                         </div>
                       </div>
                     )}
                   </div>
                 ))}
-                {games.filter(g => g.status === 'programmata').length > 0 && (
-                  <div className="bg-slate-800/40 p-4 rounded-xl border border-dashed border-slate-700 text-center">
-                    <p className="text-slate-500 text-[10px] uppercase font-black mb-4 tracking-widest italic">Partite in attesa</p>
-                    <div className="space-y-2">
-                      {games.filter(g => g.status === 'programmata').map(g => (
-                        <button key={g.id} onClick={() => updateStatus(g.id, 'in_corso')} className="w-full bg-slate-900 p-3 rounded-lg flex justify-between items-center hover:bg-cyan-500 group transition-all">
-                          <span className="font-mono text-xs text-cyan-400 group-hover:text-black">{g.match_time}</span>
-                          <span className="text-[10px] font-black uppercase group-hover:text-black">{g.home_team.name} vs {g.away_team.name}</span>
-                          <span className="bg-orange-500 text-black text-[9px] px-2 py-1 rounded font-black shadow-sm">START</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -333,7 +346,7 @@ export default function Home() {
                           <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none cursor-pointer hover:bg-slate-800/50 transition-all">
                             {editingTeam?.id === team.id ? (
                               <div className="flex gap-1 w-full" onClick={(e) => e.stopPropagation()}>
-                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none" autoFocus />
+                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none font-black" autoFocus />
                                 <button onClick={saveTeamName} className="bg-cyan-500 text-black px-3 rounded text-[9px] font-black uppercase">Ok</button>
                               </div>
                             ) : (
@@ -345,7 +358,7 @@ export default function Home() {
                               {team.players.map((p: any) => (
                                 <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
                                   {editingPlayer?.id === p.id ? (
-                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase">Ok</button></div>
+                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none font-black" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase font-black">Ok</button></div>
                                   ) : (
                                     <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500 transition-colors">❌</button></div></>
                                   )}
@@ -353,8 +366,8 @@ export default function Home() {
                               ))}
                             </ul>
                             <div className="flex gap-1.5 pt-2">
-                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500 font-black" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
-                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter">Aggiungi</button>
+                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500 font-black tracking-tighter" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
+                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter shadow-md">Aggiungi</button>
                             </div>
                           </div>
                         </details>
@@ -370,31 +383,31 @@ export default function Home() {
 
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-lg mx-auto p-2">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/4 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest">Live</span></button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/4 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest">Gironi</span></button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/4 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest">Orari</span></button>
-          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white">Admin</span></button>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/4 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Live</span></button>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/4 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Gironi</span></button>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/4 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Orari</span></button>
+          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white font-black">Admin</span></button>
         </div>
       </nav>
 
-      {/* MODALI NUOVA PARTITA / EDIT / CONFERMA */}
+      {/* --- MODALI (OMESSE PER BREVITÀ, RIMANGONO UGUALI) --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest">Crea Partita</h3>
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Crea Partita</h3>
             <div className="space-y-4 mb-8">
               <div className="grid grid-cols-1 gap-3">
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Orario</label><input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Campo</label><select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-cyan-500/20 tracking-widest">Conferma e Crea</button>
-              <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest">Annulla</button>
+              <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-cyan-500/20 tracking-widest font-black">Conferma e Crea</button>
+              <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest font-black">Annulla</button>
             </div>
           </div>
         </div>
@@ -403,15 +416,15 @@ export default function Home() {
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest">Modifica Partita</h3>
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Modifica Partita</h3>
             <div className="space-y-4 mb-8 text-center">
-              <p className="text-[10px] font-black uppercase text-slate-300 tracking-tighter">{gameToEdit.home_team.name} vs {gameToEdit.away_team.name}</p>
-              <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Orario</label><input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
-              <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest">Campo</label><select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
+              <p className="text-[10px] font-black uppercase text-slate-300 tracking-tighter font-black tracking-widest">{gameToEdit.home_team.name} vs {gameToEdit.away_team.name}</p>
+              <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
+              <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest">Salva Modifiche</button>
-              <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest">Elimina Match</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest">Chiudi</button></div>
+              <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
+              <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina Match</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
             </div>
           </div>
         </div>
@@ -420,9 +433,9 @@ export default function Home() {
       {modal.isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-widest font-black">{modal.title}</h3>
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
             <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest">No</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest">Si, Confermo</button></div>
+            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">No</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-pink-500 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Si, Confermo</button></div>
           </div>
         </div>
       )}
