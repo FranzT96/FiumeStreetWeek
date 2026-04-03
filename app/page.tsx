@@ -297,17 +297,23 @@ export default function Home() {
                     </div>
                   </div>
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
-                    <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors">
+                    <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors group">
                       <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none">
-                        <div className="flex items-center gap-2 w-1/2"><span className="text-orange-500 font-black text-xs">{index + 1}.</span><span className="uppercase text-[10px] font-black truncate">{team.name}</span></div>
+                        <div className="flex items-start gap-2 w-1/2">
+                          <span className="text-orange-500 font-black text-xs shrink-0 mt-[2px]">{index + 1}.</span>
+                          <span className="uppercase text-[10px] font-black truncate group-open:whitespace-normal group-open:break-words leading-tight">{team.name}</span>
+                        </div>
                         <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono text-center items-center">
                           <span className="text-slate-400 w-4">{team.wins}</span><span className="text-slate-400 w-4">{team.losses}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-pink-500 w-6">{team.ps}</span><span className="text-orange-400 w-6 font-black text-xs">{team.points}</span>
                         </div>
                       </summary>
-                      <div className="p-3 bg-slate-900/80 border-t border-slate-700">
-                        <ul className="grid grid-cols-2 gap-2">
+                      <div className="p-4 bg-slate-900/80 border-t border-slate-700 mt-1">
+                        <ul className="grid grid-cols-2 gap-3">
                           {team.players.map((player: any) => (
-                            <li key={player.id} className="text-slate-300 flex items-center gap-1.5 text-[10px] font-bold truncate uppercase"><span className="bg-pink-500 w-1 h-1 rounded-full"></span>{player.name}</li>
+                            <li key={player.id} className="text-slate-300 flex items-start gap-1.5 text-[10px] font-bold uppercase leading-tight break-words">
+                              <span className="bg-pink-500 w-1.5 h-1.5 rounded-full shrink-0 mt-[3px]"></span>
+                              {player.name}
+                            </li>
                           ))}
                         </ul>
                       </div>
