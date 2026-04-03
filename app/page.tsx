@@ -19,8 +19,11 @@ export default function Home() {
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
 
-  // --- STATO E REF PER L'EASTER EGG ADMIN ---
+  // --- STATI PER AUTH ED EASTER EGG ---
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
@@ -36,33 +39,71 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) setIsAdminUnlocked(true);
+    };
+    checkSession();
+
     const channelGames = supabase.channel('realtime-games').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games' }, () => { fetchData(); }).subscribe();
     const channelTeams = supabase.channel('realtime-teams').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, () => { fetchData(); }).subscribe();
     const channelPlayers = supabase.channel('realtime-players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => { fetchData(); }).subscribe();
     
     return () => { 
-      supabase.removeChannel(channelGames); 
-      supabase.removeChannel(channelTeams); 
-      supabase.removeChannel(channelPlayers); 
+      supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); 
     };
   }, []);
 
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA EASTER EGG (3 SECONDI) ---
+  // --- LOGICA EASTER EGG CON PROTEZIONE LOGIN ---
   const handlePointerDown = () => {
-    pressTimerRef.current = setTimeout(() => {
-      setIsAdminUnlocked(true);
-      setActiveTab('admin');
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(150); // Vibra per confermare lo sblocco!
+    pressTimerRef.current = setTimeout(async () => {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(150);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsAdminUnlocked(true);
+        setActiveTab('admin');
+      } else {
+        setIsLoginModalOpen(true);
       }
     }, 3000);
   };
 
   const handlePointerUp = () => {
     if (pressTimerRef.current) clearTimeout(pressTimerRef.current);
+  };
+
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      showAlert("Errore Login", "Credenziali non valide. Riprova.");
+    } else {
+      setIsAdminUnlocked(true);
+      setIsLoginModalOpen(false);
+      setActiveTab('admin');
+      setEmail('');
+      setPassword('');
+    }
+  };
+
+  // --- AZZERA TORNEO ---
+  const resetTournament = () => {
+    setModal({
+      isOpen: true,
+      title: "⚠️ ATTENZIONE NUCLEARE",
+      message: "Sei sicuro? Verranno CANCELLATE tutte le partite e AZZERATI i punti in classifica di tutte le squadre. Non si torna indietro!",
+      type: 'confirm',
+      onConfirm: async () => {
+        closeModal();
+        setLoading(true);
+        await supabase.from('games').delete().neq('id', -1);
+        await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1);
+        await fetchData();
+      }
+    });
   };
 
   // --- SCORE LOGIC (OPTIMISTIC) ---
@@ -174,8 +215,8 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO CON EASTER EGG COMPLETAMENTE INVISIBILE (Niente cursor-pointer, niente active:scale) */}
-        {activeTab !== 'admin' && (
+        {/* LOGO: Visibile SOLO ed ESCLUSIVAMENTE nel tab 'home' */}
+        {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img 
               src="/icon.png" 
@@ -203,9 +244,9 @@ export default function Home() {
                 ) : liveGames.map(game => (
                     <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
                       <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase">CAMPO {game.court}</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
+                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
                       <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
+                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
                     </div>
                   ))
                 }
@@ -217,11 +258,11 @@ export default function Home() {
                 <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossime Partite</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {nextGames.map(game => (
-                    <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-2 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
+                    <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
                       <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
-                      <div className="text-right font-bold text-slate-300 text-[10px] uppercase truncate">{game.home_team.name}</div>
+                      <div className="text-right font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team.name}</div>
                       <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
-                      <div className="text-left font-bold text-slate-300 text-[10px] uppercase truncate">{game.away_team.name}</div>
+                      <div className="text-left font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team.name}</div>
                       <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
                     </div>
                   ))}
@@ -267,42 +308,55 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- CALENDARIO --- */}
+        {/* --- CALENDARIO PUBBLICO --- */}
         {activeTab === 'calendario' && (
-          <section className="animate-fade-in pt-4 bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-            {games.map((game, i) => (
-              <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-2 p-4 ${i !== games.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                <div className="font-mono font-black text-pink-500 text-xs">{game.match_time}</div>
-                <div className="text-right font-black text-cyan-400 text-[10px] uppercase truncate">{game.home_team.name}</div>
-                <div className="flex justify-center items-center">
-                  {game.status === 'finita' ? (
-                    <div className="bg-slate-800 border-2 border-slate-700 px-2 py-1 rounded text-white font-black text-xs">{game.home_score}-{game.away_score}</div>
-                  ) : <div className="text-slate-600 font-black italic text-[10px]">VS</div>}
+          <section className="animate-fade-in space-y-4">
+            <h2 className="text-xl font-black text-orange-500 uppercase border-b-2 border-slate-800 pb-2 italic tracking-widest pt-4">Calendario Match</h2>
+            <div className="bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+              {games.map((game, i) => (
+                <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 p-3 ${i !== games.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                  <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
+                  
+                  <div className="text-right font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team.name}</div>
+                  
+                  <div className="flex justify-center items-center px-1">
+                    {game.status === 'finita' ? (
+                      <div className="bg-slate-800 border-2 border-slate-700 px-1.5 py-0.5 rounded text-white font-black text-[10px] shadow-sm">{game.home_score}-{game.away_score}</div>
+                    ) : <div className="text-slate-600 font-black italic text-[9px]">VS</div>}
+                  </div>
+                  
+                  <div className="text-left font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team.name}</div>
+                  
+                  <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
                 </div>
-                <div className="text-left font-black text-cyan-400 text-[10px] uppercase truncate">{game.away_team.name}</div>
-                <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded">{game.court}</span></div>
-              </div>
-            ))}
+              ))}
+            </div>
           </section>
         )}
 
         {/* --- ADMIN AREA --- */}
         {activeTab === 'admin' && isAdminUnlocked && (
           <section className="animate-fade-in space-y-6">
-            <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic">Control Panel</h2>
-            <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+            <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic pt-4">Control Panel</h2>
+            <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 relative">
               <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
               <button onClick={() => setActiveAdminSubTab('orari')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
+              
+              {activeAdminSubTab === 'live' && (
+                <button onClick={resetTournament} className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-600/20 text-red-500 border border-red-500/50 p-1.5 rounded-md hover:bg-red-600 hover:text-white transition-colors" title="Azzera tutto il Torneo">
+                  🗑️
+                </button>
+              )}
             </div>
 
             {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-6 pb-20">
                 {games.map(game => (
-                  <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all ${
+                  <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
                     game.status === 'in_corso' 
-                      ? 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]' 
+                      ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' 
                       : 'border-slate-800 opacity-80'
                   }`}>
                     
@@ -321,7 +375,7 @@ export default function Home() {
 
                     <div className="flex justify-between items-center bg-black p-3 rounded-lg mb-3">
                       <div className="text-center w-1/3">
-                        <p className={`text-[10px] font-black uppercase mb-1 truncate ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team.name}</p>
+                        <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team.name}</p>
                         <p className={`text-3xl font-black ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
                       </div>
                       
@@ -340,7 +394,7 @@ export default function Home() {
                       </div>
 
                       <div className="text-center w-1/3">
-                        <p className={`text-[10px] font-black uppercase mb-1 truncate ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team.name}</p>
+                        <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team.name}</p>
                         <p className={`text-3xl font-black ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
                       </div>
                     </div>
@@ -444,7 +498,24 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- MODALI (CREA / EDIT / CONFERMA) --- */}
+      {/* --- MODALE LOGIN --- */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-8 max-w-xs w-full shadow-2xl">
+            <h3 className="text-2xl font-black uppercase mb-6 text-center text-cyan-400 italic tracking-widest">Admin Login</h3>
+            <div className="space-y-4 mb-8">
+              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={handleLogin} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full">Entra</button>
+              <button onClick={() => setIsLoginModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALI CREA/EDIT/CONFERMA --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
