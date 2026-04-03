@@ -168,25 +168,24 @@ export default function Home() {
   const nextGames = games.filter(g => g.status === 'programmata').slice(0, 2);
   const activeLiveGamesCount = games.filter(g => g.status === 'in_corso').length;
 
-  // Gestione dinamica larghezza bottoni NAV (4 o 5)
   const navItemClass = isAdminUnlocked ? "w-1/5" : "w-1/4";
 
   return (
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO CON EASTER EGG (Invisibile nell'Admin per risparmiare spazio) */}
+        {/* LOGO CON EASTER EGG COMPLETAMENTE INVISIBILE (Niente cursor-pointer, niente active:scale) */}
         {activeTab !== 'admin' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img 
               src="/icon.png" 
               alt="Fiume Street Week Logo" 
-              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain cursor-pointer active:scale-95 transition-transform" 
+              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" 
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerUp}
               onPointerLeave={handlePointerUp}
-              onContextMenu={(e) => e.preventDefault()} // Evita il menu "Salva immagine" su mobile
-              style={{ WebkitTouchCallout: 'none' }} // Disabilita pop-up su iOS
+              onContextMenu={(e) => e.preventDefault()} 
+              style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} 
             />
           </div>
         )}
@@ -303,7 +302,7 @@ export default function Home() {
                 {games.map(game => (
                   <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all ${
                     game.status === 'in_corso' 
-                      ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]' 
+                      ? 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]' 
                       : 'border-slate-800 opacity-80'
                   }`}>
                     
@@ -434,21 +433,18 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-lg mx-auto p-2">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center ${navItemClass} ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Live</span></button>
           <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center ${navItemClass} ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Gironi</span></button>
           <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center ${navItemClass} ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Orari</span></button>
-          
-          {/* APPARE SOLO SE SBLOCCATO */}
           {isAdminUnlocked && (
-            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/5 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'} animate-fade-in`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white font-black">Admin</span></button>
+            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/5 animate-fade-in ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white font-black">Admin</span></button>
           )}
         </div>
       </nav>
 
-      {/* --- MODALI --- */}
+      {/* --- MODALI (CREA / EDIT / CONFERMA) --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
