@@ -242,11 +242,22 @@ export default function Home() {
                 {liveGames.length === 0 ? (
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
                 ) : liveGames.map(game => (
-                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
-                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase">CAMPO {game.court}</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
-                      <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
-                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
+                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10">CAMPO {game.court}</div>
+                      
+                      <div className="flex flex-col justify-between text-center w-[40%] mt-4">
+                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.home_team.name}</p>
+                        <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.home_score}</p>
+                      </div>
+                      
+                      <div className="flex flex-col justify-center text-center w-[20%] mt-4">
+                        <span className="text-pink-500 font-black italic animate-pulse">VS</span>
+                      </div>
+                      
+                      <div className="flex flex-col justify-between text-center w-[40%] mt-4">
+                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.away_team.name}</p>
+                        <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.away_score}</p>
+                      </div>
                     </div>
                   ))
                 }
@@ -337,17 +348,21 @@ export default function Home() {
         {/* --- ADMIN AREA --- */}
         {activeTab === 'admin' && isAdminUnlocked && (
           <section className="animate-fade-in space-y-6">
-            <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic pt-4">Control Panel</h2>
-            <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 relative">
-              <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
-              <button onClick={() => setActiveAdminSubTab('orari')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
-              <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
-              
+            
+            {/* INTESTAZIONE CON BIDONCINO ALLINEATO */}
+            <div className="flex justify-between items-end border-b-2 border-orange-500 pb-2 pt-4">
+              <h2 className="text-2xl font-black text-orange-500 uppercase italic m-0 leading-none">Control Panel</h2>
               {activeAdminSubTab === 'live' && (
-                <button onClick={resetTournament} className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-600/20 text-red-500 border border-red-500/50 p-1.5 rounded-md hover:bg-red-600 hover:text-white transition-colors" title="Azzera tutto il Torneo">
+                <button onClick={resetTournament} className="bg-red-600/20 text-red-500 border border-red-500/50 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors flex items-center justify-center shadow-lg" title="Azzera tutto il Torneo">
                   🗑️
                 </button>
               )}
+            </div>
+
+            <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+              <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
+              <button onClick={() => setActiveAdminSubTab('orari')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
+              <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
             {/* LIVE CONTROL */}
@@ -373,13 +388,14 @@ export default function Home() {
                       )}
                     </div>
 
-                    <div className="flex justify-between items-center bg-black p-3 rounded-lg mb-3">
-                      <div className="text-center w-1/3">
+                    <div className="flex justify-between items-stretch bg-black p-3 rounded-lg mb-3">
+                      
+                      <div className="flex flex-col justify-between text-center w-[35%]">
                         <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team.name}</p>
-                        <p className={`text-3xl font-black ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
+                        <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
                       </div>
                       
-                      <div className="text-center w-1/3 px-1">
+                      <div className="flex flex-col justify-center text-center w-[30%] px-1">
                         {game.status === 'programmata' && (
                           <button 
                             onClick={() => updateStatus(game.id, 'in_corso')} 
@@ -393,10 +409,11 @@ export default function Home() {
                         {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
                       </div>
 
-                      <div className="text-center w-1/3">
+                      <div className="flex flex-col justify-between text-center w-[35%]">
                         <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team.name}</p>
-                        <p className={`text-3xl font-black ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
+                        <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
                       </div>
+                      
                     </div>
 
                     {game.status === 'in_corso' && (
