@@ -9,7 +9,7 @@ export default function Home() {
   const [games, setGames] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
-  const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); // NUOVO STATO PER I DUE TAB ORARI
+  const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
   
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A' });
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
@@ -131,6 +131,14 @@ export default function Home() {
     if (a.match_time !== b.match_time) return a.match_time.localeCompare(b.match_time);
     return a.court.localeCompare(b.court);
   });
+
+  // --- LOGICA ORDINAMENTO ADMIN LIVE TAB ---
+  // Mette le partite in corso per prime, poi quelle da giocare, infine quelle finite
+  const adminLiveGames = [
+    ...sortedGames.filter(g => g.status === 'in_corso'),
+    ...sortedGames.filter(g => g.status === 'programmata'),
+    ...sortedGames.filter(g => g.status === 'finita')
+  ];
 
   // --- LOGICA GENERAZIONE TABELLONE PLAYOFF ---
   const generateBracket = async () => {
@@ -543,12 +551,13 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[80px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
             </div>
 
-            {/* LIVE CONTROL */}
+            {/* LIVE CONTROL (ORDINATO CON IN CORSO -> PROGRAMMATE -> FINITE IN FONDO) */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-6 pb-20">
-                {sortedGames.map(game => (
+                {adminLiveGames.map(game => (
                   <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
-                    game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 'border-slate-800 opacity-80'
+                    game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 
+                    game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-slate-700'
                   }`}>
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
@@ -768,9 +777,9 @@ export default function Home() {
                 <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
+                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
@@ -793,9 +802,9 @@ export default function Home() {
                 <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Ospite</label><select value={gameToEdit.away_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, away_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
+              <div className="flex gap-3 mt-4">
+                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label><input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" /></div>
+                <div className="flex-1 min-w-0"><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label><select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black"><option value="A">Campo A</option><option value="B">Campo B</option></select></div>
               </div>
             </div>
             <div className="flex flex-col gap-3">
