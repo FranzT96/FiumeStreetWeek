@@ -59,7 +59,6 @@ export default function Home() {
     const game = games.find(g => g.id === gameId);
     if (!game) return;
 
-    // CONTROLLO LIMITE 2 PARTITE LIVE
     if (newStatus === 'in_corso' && game.status !== 'in_corso') {
       const liveCount = games.filter(g => g.status === 'in_corso').length;
       if (liveCount >= 2) {
@@ -154,13 +153,14 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24">
       <div className="max-w-6xl mx-auto space-y-8">
         
+        {/* LOGO INVECE DEL TESTO */}
         {activeTab !== 'admin' && (
-          <div className="text-center mb-8 pt-4 animate-fade-in">
-            <h1 className="text-6xl md:text-8xl font-black uppercase tracking-tighter transform -skew-x-6 leading-[0.85]">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-cyan-600 drop-shadow-lg block italic">FIUME</span>
-              <span className="text-orange-500 drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] block mt-2">STREET WEEK</span>
-            </h1>
-            <p className="mt-4 text-pink-500 font-black tracking-[0.3em] text-2xl">2026</p>
+          <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
+            <img 
+              src="/icon.png" 
+              alt="Fiume Street Week Logo" 
+              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" 
+            />
           </div>
         )}
 
@@ -175,8 +175,10 @@ export default function Home() {
                 {liveGames.length === 0 ? (
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
                 ) : liveGames.map(game => (
-                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]">
-                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
+                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
+                      {/* ETICHETTA CAMPO CON SPIGOLO ARROTONDATO (rounded-tr-[10px]) */}
+                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase">CAMPO {game.court}</div>
+                      
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
                       <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
                       <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
@@ -211,34 +213,19 @@ export default function Home() {
             {groups.map((group) => (
               <div key={group} className="bg-slate-900 rounded-2xl border-4 border-cyan-500 shadow-[6px_6px_0px_0px_rgba(249,115,22,1)] overflow-hidden">
                 <div className="bg-cyan-500 text-slate-900 p-2 text-center"><h3 className="text-xl font-black uppercase italic">GIRONE {group}</h3></div>
-                
                 <div className="p-3 space-y-2">
-                  {/* INTESTAZIONE COLONNE */}
                   <div className="flex justify-between px-3 pb-1 text-[10px] font-black text-slate-400 border-b border-slate-700/50">
                     <div className="w-1/2">SQUADRA</div>
                     <div className="flex w-1/2 justify-end gap-2 font-mono text-center">
-                      <span className="w-4" title="Vinte">V</span>
-                      <span className="w-4" title="Perse">P</span>
-                      <span className="w-6" title="Punti Fatti">PF</span>
-                      <span className="w-6" title="Punti Subiti">PS</span>
-                      <span className="w-6 text-orange-500" title="Punti in Classifica">PT</span>
+                      <span className="w-4" title="Vinte">V</span><span className="w-4" title="Perse">P</span><span className="w-6" title="Punti Fatti">PF</span><span className="w-6" title="Punti Subiti">PS</span><span className="w-6 text-orange-500" title="Punti in Classifica">PT</span>
                     </div>
                   </div>
-
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
                     <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors">
                       <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none">
-                        <div className="flex items-center gap-2 w-1/2">
-                          <span className="text-orange-500 font-black text-xs">{index + 1}.</span>
-                          <span className="uppercase text-[10px] font-black truncate">{team.name}</span>
-                        </div>
-                        {/* VALORI SQUADRA */}
+                        <div className="flex items-center gap-2 w-1/2"><span className="text-orange-500 font-black text-xs">{index + 1}.</span><span className="uppercase text-[10px] font-black truncate">{team.name}</span></div>
                         <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono text-center items-center">
-                          <span className="text-slate-400 w-4">{team.wins}</span>
-                          <span className="text-slate-400 w-4">{team.losses}</span>
-                          <span className="text-cyan-500 w-6">{team.pf}</span>
-                          <span className="text-pink-500 w-6">{team.ps}</span>
-                          <span className="text-orange-400 w-6 font-black text-xs">{team.points}</span>
+                          <span className="text-slate-400 w-4">{team.wins}</span><span className="text-slate-400 w-4">{team.losses}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-pink-500 w-6">{team.ps}</span><span className="text-orange-400 w-6 font-black text-xs">{team.points}</span>
                         </div>
                       </summary>
                       <div className="p-3 bg-slate-900/80 border-t border-slate-700">
@@ -280,7 +267,6 @@ export default function Home() {
           <section className="animate-fade-in space-y-6">
             <h2 className="text-2xl font-black text-orange-500 uppercase border-b-2 border-orange-500 pb-2 italic">Control Panel</h2>
             <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-              {/* PALLINO VERDE INSERITO QUI */}
               <button onClick={() => setActiveAdminSubTab('live')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
               <button onClick={() => setActiveAdminSubTab('orari')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
@@ -296,7 +282,6 @@ export default function Home() {
                       : 'border-slate-800 opacity-80'
                   }`}>
                     
-                    {/* Header Card */}
                     <div className="flex justify-between items-center mb-3">
                       <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
                       {game.status === 'finita' && (
@@ -310,7 +295,6 @@ export default function Home() {
                       )}
                     </div>
 
-                    {/* Main Score Area */}
                     <div className="flex justify-between items-center bg-black p-3 rounded-lg mb-3">
                       <div className="text-center w-1/3">
                         <p className={`text-[10px] font-black uppercase mb-1 truncate ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team.name}</p>
@@ -337,19 +321,15 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Score Buttons (Only when Live) */}
                     {game.status === 'in_corso' && (
                       <div className="flex justify-between items-center w-full gap-2 mt-2">
-                        {/* HOME BUTTONS */}
                         <div className="flex gap-1">
                           <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
                           <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
                           <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
                           <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
                         </div>
-                        {/* VS DIVIDER */}
                         <span className="text-[10px] text-slate-600 font-black italic">VS</span>
-                        {/* AWAY BUTTONS */}
                         <div className="flex gap-1">
                           <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
                           <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
@@ -363,7 +343,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* ORARI ADMIN */}
+            {/* ORARI E ROSTER (OMESSI PER BREVITÀ, RIMANGONO IDENTICI ALLA VERSIONE PRECEDENTE) */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4 pb-20">
                 <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Partita</button>
@@ -382,7 +362,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* ROSTER ADMIN */}
             {activeAdminSubTab === 'roster' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                 {groups.map((group) => (
