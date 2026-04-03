@@ -11,7 +11,6 @@ export default function Home() {
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
   const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
   
-  // Aggiunto "stage" di default per decidere in quale giorno creare l'evento/partita
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
   const [editingPlayer, setEditingPlayer] = useState<{ id: number, name: string } | null>(null);
@@ -33,7 +32,6 @@ export default function Home() {
   const groups = ['A', 'B', 'C', 'D'];
   const playoffStages = ['ottavi', 'quarti', 'semi', 'finali'];
 
-  // SCHEMA FITTIZIO DELLE FINALI (Mostrato se il tabellone non è ancora generato)
   const dummyFinals = [
     { id: 'd1', match_time: '19:00', court: 'A', status: 'programmata', is_event: false },
     { id: 'd2', match_time: '19:00', court: 'B', status: 'programmata', is_event: false },
@@ -292,7 +290,6 @@ export default function Home() {
     fetchData();
   };
 
-  // --- MOTORE DI SCALAMENTO TEMPORALE ---
   const addMinutesToTime = (timeStr: string, minsToAdd: number) => {
     const [h, m] = timeStr.split(':').map(Number);
     const date = new Date();
@@ -304,16 +301,16 @@ export default function Home() {
     if (!newGame.is_event && (!newGame.home_id || !newGame.away_id)) return;
     if (newGame.is_event && !newGame.event_description) return;
 
-    setLoading(true);
+    // Chiudiamo IMMEDIATAMENTE la modale per l'esperienza turbo fluida
+    setIsNewGameModalOpen(false);
+    
     const duration = parseInt(newGame.event_duration) || 0;
 
-    // Se è un evento con durata, scala in avanti SOLO le partite dello STESSO GIORNO (stessa fase) e da quell'ora in poi
     if (newGame.is_event && duration > 0) {
       const isQualifiche = newGame.stage === 'girone';
       
       const gamesToShift = games.filter(g => {
         const isGameQualifiche = !g.stage || g.stage === 'girone';
-        // Devono appartenere alla stessa giornata (Qualifiche = Qualifiche, Finali = Finali) e avere orario >= all'evento
         return isQualifiche === isGameQualifiche && g.match_time >= newGame.time;
       });
 
@@ -329,14 +326,13 @@ export default function Home() {
       match_time: newGame.time, 
       court: newGame.court, 
       status: 'programmata', 
-      stage: newGame.stage, // Registriamo la fase scelta nel menu a tendina
+      stage: newGame.stage, 
       is_event: newGame.is_event,
       event_description: newGame.event_description,
       event_duration: duration
     });
     
     setNewGame({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
-    setIsNewGameModalOpen(false);
     fetchData();
   };
 
@@ -407,7 +403,7 @@ export default function Home() {
                 ) : liveGames.map(game => {
                   if (game.is_event) {
                     return (
-                      <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)] overflow-hidden min-h-[120px]">
+                      <div key={game.id} className="bg-gradient-to-r from-pink-900/50 to-orange-900/50 border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)] overflow-hidden min-h-[120px]">
                         <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10">CAMPO {game.court}</div>
                         <span className="text-3xl mb-2 animate-pulse">🔥</span>
                         <p className="text-[14px] text-white font-black uppercase leading-tight text-center tracking-widest px-4">{game.event_description}</p>
@@ -439,10 +435,10 @@ export default function Home() {
                   {nextGames.map(game => {
                     if (game.is_event) {
                       return (
-                        <div key={game.id} className="grid grid-cols-[45px_1fr_25px] items-center gap-2 bg-slate-800/40 border border-pink-500/50 rounded-xl p-3 shadow-lg">
-                          <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
-                          <div className="text-center font-black text-pink-500 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                          <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                        <div key={game.id} className="grid grid-cols-[45px_1fr_25px] items-center gap-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl p-3 shadow-lg">
+                          <div className="font-mono font-black text-orange-400 text-xs">{game.match_time}</div>
+                          <div className="text-center font-black text-pink-300 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
+                          <div className="flex justify-center"><span className="bg-pink-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
                         </div>
                       );
                     }
@@ -526,10 +522,10 @@ export default function Home() {
                 return displayList.map((game, i) => {
                   if (game.is_event) {
                     return (
-                      <div key={game.id} className={`grid grid-cols-[45px_1fr_25px] items-center gap-2 p-3 bg-slate-800/20 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                        <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
-                        <div className="text-center font-black text-pink-500 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                        <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                      <div key={game.id} className="grid grid-cols-[45px_1fr_25px] items-center gap-2 p-3 mx-2 my-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl shadow-lg">
+                        <div className="font-mono font-black text-orange-400 text-[10px]">{game.match_time}</div>
+                        <div className="text-center font-black text-pink-400 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
+                        <div className="flex justify-center"><span className="bg-pink-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
                       </div>
                     );
                   }
@@ -647,19 +643,19 @@ export default function Home() {
                     return filteredLiveGames.map(game => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all ${game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]' : game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-pink-500/50'}`}>
+                          <div key={game.id} className={`bg-gradient-to-r from-pink-900/40 to-orange-900/40 p-4 rounded-xl border-2 transition-all ${game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]' : game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-pink-500/50'}`}>
                              <div className="flex justify-between items-center mb-3">
-                               <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
+                               <span className="text-[10px] text-slate-300 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
                                {game.status === 'finita' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}><span>↺</span> Riapri</button>}
                              </div>
-                             <div className="flex flex-col items-center justify-center bg-black p-4 rounded-lg mb-3 min-h-[80px]">
+                             <div className="flex flex-col items-center justify-center bg-black/60 p-4 rounded-lg mb-3 min-h-[80px]">
                                <span className="text-2xl mb-1">🔥</span>
-                               <p className="text-[12px] font-black uppercase text-pink-500 tracking-widest text-center">{game.event_description}</p>
+                               <p className="text-[12px] font-black uppercase text-pink-400 tracking-widest text-center">{game.event_description}</p>
                              </div>
                              <div className="flex justify-center px-1">
                                {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-black text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-opacity ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : ''}`}>Avvia Evento</button>}
                                {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest">Chiudi Evento</button>}
-                               {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Evento Terminato</span>}
+                               {game.status === 'finita' && <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block">Evento Terminato</span>}
                              </div>
                           </div>
                         );
@@ -749,11 +745,11 @@ export default function Home() {
                     return displayList.map((game, i) => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className={`grid grid-cols-[45px_1fr_25px_30px] items-center gap-2 p-3 hover:bg-slate-800/30 transition-colors bg-slate-800/20 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                            <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
-                            <span className="text-[11px] font-black uppercase text-pink-500 text-center tracking-widest break-words">{game.event_description}</span>
-                            <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
-                            <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right">✏️</button>
+                          <div key={game.id} className={`grid grid-cols-[45px_1fr_25px_30px] items-center gap-2 p-3 mx-2 my-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl shadow-lg`}>
+                            <span className="font-mono text-orange-400 text-[10px] font-black">{game.match_time}</span>
+                            <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words">{game.event_description}</span>
+                            <div className="flex justify-center"><span className="bg-pink-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                            <button onClick={() => setGameToEdit({ ...game })} className="text-slate-300 hover:text-white p-2 text-right">✏️</button>
                           </div>
                         );
                       }
@@ -903,7 +899,7 @@ export default function Home() {
               
               <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <input type="checkbox" id="isEventToggle" checked={newGame.is_event} onChange={(e) => setNewGame({...newGame, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
-                <label htmlFor="isEventToggle" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">Evento Speciale (Es. 3pt Contest)</label>
+                <label htmlFor="isEventToggle" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">Evento Speciale</label>
               </div>
 
               <div>
