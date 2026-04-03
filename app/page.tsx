@@ -24,7 +24,7 @@ export default function Home() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); // Stato per la scelta degli incroci
+  const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
@@ -96,9 +96,28 @@ export default function Home() {
     });
   };
 
-  // --- LOGICA GENERAZIONE TABELLONE PLAYOFF (Personalizzabile) ---
+  // --- LOGICA ORDINAMENTO INTELLIGENTE GIOCHI ---
+  // Diamo un "peso" ad ogni fase per ordinarle correttamente nel calendario (il giorno 2 non deve mescolarsi al giorno 1)
+  const getStageWeight = (stage: string) => {
+    if (!stage || stage === 'girone') return 0;
+    if (stage === 'ottavi') return 1;
+    if (stage === 'quarti') return 2;
+    if (stage === 'semi') return 3;
+    if (stage === 'finali') return 4;
+    return 5;
+  };
+
+  const sortedGames = [...games].sort((a, b) => {
+    const wA = getStageWeight(a.stage);
+    const wB = getStageWeight(b.stage);
+    if (wA !== wB) return wA - wB; // Prima ordina per FASE (Gironi -> Ottavi -> Quarti...)
+    if (a.match_time !== b.match_time) return a.match_time.localeCompare(b.match_time); // Poi per ORARIO
+    return a.court.localeCompare(b.court); // Poi per CAMPO (A prima di B)
+  });
+
+  // --- LOGICA GENERAZIONE TABELLONE PLAYOFF ---
   const generateBracket = async () => {
-    if (games.some(g => g.stage !== 'girone')) {
+    if (games.some(g => g.stage && g.stage !== 'girone')) {
       showAlert("Attenzione", "I Playoff sono già stati generati! Se vuoi rigenerarli, premi il bidoncino 🗑️ nel tab Live per azzerare tutto e ricalcolare gli incroci.");
       return;
     }
@@ -109,7 +128,6 @@ export default function Home() {
       return gTeams[rank - 1]?.id || null;
     };
 
-    // Mappa per tradurre il selettore dell'Admin nei gruppi incrociati
     const schemeMap: Record<string, string[]> = {
       'AB_CD': ['A', 'B', 'C', 'D'],
       'AC_BD': ['A', 'C', 'B', 'D'],
@@ -118,29 +136,29 @@ export default function Home() {
     const [g1, g2, g3, g4] = schemeMap[playoffScheme];
 
     const playoffMatches = [
-      // OTTAVI DI FINALE (Incroci perfetti per evitare scontri diretti tra i primi dei blocchi fino alle fasi finali)
-      { stage: 'ottavi', bracket_code: 'O1', home_team_id: getTeam(g1, 1), away_team_id: getTeam(g2, 4), match_time: '18:00', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O2', home_team_id: getTeam(g3, 2), away_team_id: getTeam(g4, 3), match_time: '18:00', court: 'B', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O3', home_team_id: getTeam(g2, 1), away_team_id: getTeam(g1, 4), match_time: '18:30', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O4', home_team_id: getTeam(g4, 2), away_team_id: getTeam(g3, 3), match_time: '18:30', court: 'B', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O5', home_team_id: getTeam(g3, 1), away_team_id: getTeam(g4, 4), match_time: '19:00', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O6', home_team_id: getTeam(g1, 2), away_team_id: getTeam(g2, 3), match_time: '19:00', court: 'B', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O7', home_team_id: getTeam(g4, 1), away_team_id: getTeam(g3, 4), match_time: '19:30', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O8', home_team_id: getTeam(g2, 2), away_team_id: getTeam(g1, 3), match_time: '19:30', court: 'B', status: 'programmata' },
+      // OTTAVI DI FINALE (Dalle 19:00 ogni 20 min, su Campo A e B)
+      { stage: 'ottavi', bracket_code: 'O1', home_team_id: getTeam(g1, 1), away_team_id: getTeam(g2, 4), match_time: '19:00', court: 'A', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O2', home_team_id: getTeam(g3, 2), away_team_id: getTeam(g4, 3), match_time: '19:00', court: 'B', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O3', home_team_id: getTeam(g2, 1), away_team_id: getTeam(g1, 4), match_time: '19:20', court: 'A', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O4', home_team_id: getTeam(g4, 2), away_team_id: getTeam(g3, 3), match_time: '19:20', court: 'B', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O5', home_team_id: getTeam(g3, 1), away_team_id: getTeam(g4, 4), match_time: '19:40', court: 'A', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O6', home_team_id: getTeam(g1, 2), away_team_id: getTeam(g2, 3), match_time: '19:40', court: 'B', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O7', home_team_id: getTeam(g4, 1), away_team_id: getTeam(g3, 4), match_time: '20:00', court: 'A', status: 'programmata' },
+      { stage: 'ottavi', bracket_code: 'O8', home_team_id: getTeam(g2, 2), away_team_id: getTeam(g1, 3), match_time: '20:00', court: 'B', status: 'programmata' },
 
-      // QUARTI (Squadre null finché non vincono gli ottavi)
-      { stage: 'quarti', bracket_code: 'Q1', match_time: '20:30', court: 'A', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q2', match_time: '20:30', court: 'B', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q3', match_time: '21:00', court: 'A', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q4', match_time: '21:00', court: 'B', status: 'programmata' },
+      // QUARTI (Dalle 20:20 ogni 20 min, su Campo A e B)
+      { stage: 'quarti', bracket_code: 'Q1', match_time: '20:20', court: 'A', status: 'programmata' },
+      { stage: 'quarti', bracket_code: 'Q2', match_time: '20:20', court: 'B', status: 'programmata' },
+      { stage: 'quarti', bracket_code: 'Q3', match_time: '20:40', court: 'A', status: 'programmata' },
+      { stage: 'quarti', bracket_code: 'Q4', match_time: '20:40', court: 'B', status: 'programmata' },
 
-      // SEMIFINALI
-      { stage: 'semi', bracket_code: 'S1', match_time: '21:45', court: 'A', status: 'programmata' },
-      { stage: 'semi', bracket_code: 'S2', match_time: '21:45', court: 'B', status: 'programmata' },
+      // SEMIFINALI (Solo Campo A, ogni 20 min)
+      { stage: 'semi', bracket_code: 'S1', match_time: '21:00', court: 'A', status: 'programmata' },
+      { stage: 'semi', bracket_code: 'S2', match_time: '21:20', court: 'A', status: 'programmata' },
 
-      // FINALI
-      { stage: 'finali', bracket_code: 'F3', match_time: '22:30', court: 'B', status: 'programmata' }, // Terzo Posto
-      { stage: 'finali', bracket_code: 'F1', match_time: '23:00', court: 'A', status: 'programmata' }, // Finalissima
+      // FINALI (Solo Campo A, durata 30 min)
+      { stage: 'finali', bracket_code: 'F3', match_time: '21:40', court: 'A', status: 'programmata' }, // Terzo Posto
+      { stage: 'finali', bracket_code: 'F1', match_time: '22:10', court: 'A', status: 'programmata' }, // Finalissima
     ];
 
     await supabase.from('games').insert(playoffMatches);
@@ -154,7 +172,6 @@ export default function Home() {
     let nextGameCode = null; let isHome = true;
     let loserGameCode = null; let loserIsHome = true;
 
-    // Mappa Avanzamento Turni
     switch(code) {
         case 'O1': nextGameCode = 'Q1'; isHome = true; break;
         case 'O2': nextGameCode = 'Q1'; isHome = false; break;
@@ -213,7 +230,6 @@ export default function Home() {
       const winnerId = homeWon ? game.home_team_id : game.away_team_id;
       const loserId = homeWon ? game.away_team_id : game.home_team_id;
 
-      // Se è un girone, aggiorna le classifiche
       if (game.stage === 'girone' || !game.stage) {
         const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
         if (dbGame) {
@@ -225,7 +241,6 @@ export default function Home() {
           }
         }
       } else {
-        // Se è un PLAYOFF, avanza automaticamente la squadra vincente
         await advancePlayoffTeam(game, winnerId, loserId);
       }
     } 
@@ -297,13 +312,12 @@ export default function Home() {
 
   if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione...</div>;
 
-  const liveGames = games.filter(g => g.status === 'in_corso').slice(0, 2);
-  const nextGames = games.filter(g => g.status === 'programmata').slice(0, 2);
+  const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
+  const nextGames = sortedGames.filter(g => g.status === 'programmata').slice(0, 2);
   const activeLiveGamesCount = games.filter(g => g.status === 'in_corso').length;
 
   const navItemClass = isAdminUnlocked ? "w-1/5" : "w-1/4";
 
-  // Helper visivo per le squadre TBD nei playoff
   const renderTeamName = (team: any, bracketCode: string, isHome: boolean) => {
     if (team && team.name) return team.name;
     return `TBD (Da decidere)`;
@@ -414,8 +428,8 @@ export default function Home() {
           <section className="animate-fade-in space-y-4">
             <h2 className="text-xl font-black text-orange-500 uppercase border-b-2 border-slate-800 pb-2 italic tracking-widest pt-4">Tutti i Match</h2>
             <div className="bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-              {games.map((game, i) => (
-                <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 p-3 ${i !== games.length - 1 ? 'border-b border-slate-800' : ''}`}>
+              {sortedGames.map((game, i) => (
+                <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 p-3 ${i !== sortedGames.length - 1 ? 'border-b border-slate-800' : ''}`}>
                   <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
                   <div className="text-right font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
                   <div className="flex justify-center items-center px-1">
@@ -444,7 +458,7 @@ export default function Home() {
             ) : (
               <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar px-2">
                 {playoffStages.map(stage => {
-                  const stageGames = games.filter(g => g.stage === stage);
+                  const stageGames = sortedGames.filter(g => g.stage === stage);
                   if (stageGames.length === 0) return null;
                   
                   return (
@@ -508,7 +522,7 @@ export default function Home() {
             {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-6 pb-20">
-                {games.map(game => (
+                {sortedGames.map(game => (
                   <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
                     game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 'border-slate-800 opacity-80'
                   }`}>
@@ -570,7 +584,7 @@ export default function Home() {
               <div className="space-y-4 pb-20">
                 <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Partita</button>
                 <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
-                  {games.map(game => (
+                  {sortedGames.map(game => (
                     <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 border-b border-slate-800 last:border-0 hover:bg-slate-800/30 transition-colors">
                       <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
                       <span className="text-[10px] font-black uppercase text-slate-200 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
@@ -723,7 +737,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* QUICK EDIT MODAL (Per sistemare emergenze nei playoff, puoi assegnare a mano le squadre a uno slot) */}
+      {/* QUICK EDIT MODAL */}
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
