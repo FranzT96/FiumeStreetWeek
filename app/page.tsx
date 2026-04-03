@@ -11,7 +11,8 @@ export default function Home() {
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
   const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
   
-  const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A' });
+  // Aggiunto "stage" di default per decidere in quale giorno creare l'evento/partita
+  const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
   const [editingPlayer, setEditingPlayer] = useState<{ id: number, name: string } | null>(null);
   const [editingTeam, setEditingTeam] = useState<{ id: number, name: string } | null>(null);
@@ -34,27 +35,27 @@ export default function Home() {
 
   // SCHEMA FITTIZIO DELLE FINALI (Mostrato se il tabellone non è ancora generato)
   const dummyFinals = [
-    { id: 'd1', match_time: '19:00', court: 'A', status: 'programmata' },
-    { id: 'd2', match_time: '19:00', court: 'B', status: 'programmata' },
-    { id: 'd3', match_time: '19:20', court: 'A', status: 'programmata' },
-    { id: 'd4', match_time: '19:20', court: 'B', status: 'programmata' },
-    { id: 'd5', match_time: '19:40', court: 'A', status: 'programmata' },
-    { id: 'd6', match_time: '19:40', court: 'B', status: 'programmata' },
-    { id: 'd7', match_time: '20:00', court: 'A', status: 'programmata' },
-    { id: 'd8', match_time: '20:00', court: 'B', status: 'programmata' },
-    { id: 'd9', match_time: '20:20', court: 'A', status: 'programmata' },
-    { id: 'd10', match_time: '20:20', court: 'B', status: 'programmata' },
-    { id: 'd11', match_time: '20:40', court: 'A', status: 'programmata' },
-    { id: 'd12', match_time: '20:40', court: 'B', status: 'programmata' },
-    { id: 'd13', match_time: '21:00', court: 'A', status: 'programmata' },
-    { id: 'd14', match_time: '21:20', court: 'A', status: 'programmata' },
-    { id: 'd15', match_time: '21:40', court: 'A', status: 'programmata' },
-    { id: 'd16', match_time: '22:10', court: 'A', status: 'programmata' },
+    { id: 'd1', match_time: '19:00', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd2', match_time: '19:00', court: 'B', status: 'programmata', is_event: false },
+    { id: 'd3', match_time: '19:20', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd4', match_time: '19:20', court: 'B', status: 'programmata', is_event: false },
+    { id: 'd5', match_time: '19:40', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd6', match_time: '19:40', court: 'B', status: 'programmata', is_event: false },
+    { id: 'd7', match_time: '20:00', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd8', match_time: '20:00', court: 'B', status: 'programmata', is_event: false },
+    { id: 'd9', match_time: '20:20', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd10', match_time: '20:20', court: 'B', status: 'programmata', is_event: false },
+    { id: 'd11', match_time: '20:40', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd12', match_time: '20:40', court: 'B', status: 'programmata', is_event: false },
+    { id: 'd13', match_time: '21:00', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd14', match_time: '21:20', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd15', match_time: '21:40', court: 'A', status: 'programmata', is_event: false },
+    { id: 'd16', match_time: '22:10', court: 'A', status: 'programmata', is_event: false },
   ];
 
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
-    const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
+    const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
     if (teamsData) setTeams(teamsData);
     if (gamesData) setGames(gamesData);
     setLoading(false);
@@ -114,7 +115,6 @@ export default function Home() {
     });
   };
 
-  // --- LOGICA ORDINAMENTO INTELLIGENTE GIOCHI ---
   const getStageWeight = (stage: string) => {
     if (!stage || stage === 'girone') return 0;
     if (stage === 'ottavi') return 1;
@@ -132,53 +132,45 @@ export default function Home() {
     return a.court.localeCompare(b.court);
   });
 
-  // --- LOGICA ORDINAMENTO ADMIN LIVE TAB ---
-  // Mette le partite in corso per prime, poi quelle da giocare, infine quelle finite
   const adminLiveGames = [
     ...sortedGames.filter(g => g.status === 'in_corso'),
     ...sortedGames.filter(g => g.status === 'programmata'),
     ...sortedGames.filter(g => g.status === 'finita')
   ];
 
-  // --- LOGICA GENERAZIONE TABELLONE PLAYOFF ---
   const generateBracket = async () => {
     if (games.some(g => g.stage && g.stage !== 'girone')) {
       showAlert("Attenzione", "I Playoff sono già stati generati! Se vuoi rigenerarli, premi il bidoncino 🗑️ nel tab Live per azzerare tutto e ricalcolare gli incroci.");
       return;
     }
-
     setLoading(true);
     const getTeam = (group: string, rank: number) => {
       const gTeams = teams.filter(t => t.group_name === group);
       return gTeams[rank - 1]?.id || null;
     };
-
     const schemeMap: Record<string, string[]> = {
-      'AB_CD': ['A', 'B', 'C', 'D'],
-      'AC_BD': ['A', 'C', 'B', 'D'],
-      'AD_BC': ['A', 'D', 'B', 'C']
+      'AB_CD': ['A', 'B', 'C', 'D'], 'AC_BD': ['A', 'C', 'B', 'D'], 'AD_BC': ['A', 'D', 'B', 'C']
     };
     const [g1, g2, g3, g4] = schemeMap[playoffScheme];
 
     const playoffMatches = [
-      { stage: 'ottavi', bracket_code: 'O1', home_team_id: getTeam(g1, 1), away_team_id: getTeam(g2, 4), match_time: '19:00', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O2', home_team_id: getTeam(g3, 2), away_team_id: getTeam(g4, 3), match_time: '19:00', court: 'B', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O3', home_team_id: getTeam(g2, 1), away_team_id: getTeam(g1, 4), match_time: '19:20', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O4', home_team_id: getTeam(g4, 2), away_team_id: getTeam(g3, 3), match_time: '19:20', court: 'B', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O5', home_team_id: getTeam(g3, 1), away_team_id: getTeam(g4, 4), match_time: '19:40', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O6', home_team_id: getTeam(g1, 2), away_team_id: getTeam(g2, 3), match_time: '19:40', court: 'B', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O7', home_team_id: getTeam(g4, 1), away_team_id: getTeam(g3, 4), match_time: '20:00', court: 'A', status: 'programmata' },
-      { stage: 'ottavi', bracket_code: 'O8', home_team_id: getTeam(g2, 2), away_team_id: getTeam(g1, 3), match_time: '20:00', court: 'B', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q1', match_time: '20:20', court: 'A', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q2', match_time: '20:20', court: 'B', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q3', match_time: '20:40', court: 'A', status: 'programmata' },
-      { stage: 'quarti', bracket_code: 'Q4', match_time: '20:40', court: 'B', status: 'programmata' },
-      { stage: 'semi', bracket_code: 'S1', match_time: '21:00', court: 'A', status: 'programmata' },
-      { stage: 'semi', bracket_code: 'S2', match_time: '21:20', court: 'A', status: 'programmata' },
-      { stage: 'finali', bracket_code: 'F3', match_time: '21:40', court: 'A', status: 'programmata' }, 
-      { stage: 'finali', bracket_code: 'F1', match_time: '22:10', court: 'A', status: 'programmata' }, 
+      { stage: 'ottavi', bracket_code: 'O1', home_team_id: getTeam(g1, 1), away_team_id: getTeam(g2, 4), match_time: '19:00', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O2', home_team_id: getTeam(g3, 2), away_team_id: getTeam(g4, 3), match_time: '19:00', court: 'B', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O3', home_team_id: getTeam(g2, 1), away_team_id: getTeam(g1, 4), match_time: '19:20', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O4', home_team_id: getTeam(g4, 2), away_team_id: getTeam(g3, 3), match_time: '19:20', court: 'B', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O5', home_team_id: getTeam(g3, 1), away_team_id: getTeam(g4, 4), match_time: '19:40', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O6', home_team_id: getTeam(g1, 2), away_team_id: getTeam(g2, 3), match_time: '19:40', court: 'B', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O7', home_team_id: getTeam(g4, 1), away_team_id: getTeam(g3, 4), match_time: '20:00', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'ottavi', bracket_code: 'O8', home_team_id: getTeam(g2, 2), away_team_id: getTeam(g1, 3), match_time: '20:00', court: 'B', status: 'programmata', is_event: false },
+      { stage: 'quarti', bracket_code: 'Q1', match_time: '20:20', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'quarti', bracket_code: 'Q2', match_time: '20:20', court: 'B', status: 'programmata', is_event: false },
+      { stage: 'quarti', bracket_code: 'Q3', match_time: '20:40', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'quarti', bracket_code: 'Q4', match_time: '20:40', court: 'B', status: 'programmata', is_event: false },
+      { stage: 'semi', bracket_code: 'S1', match_time: '21:00', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'semi', bracket_code: 'S2', match_time: '21:20', court: 'A', status: 'programmata', is_event: false },
+      { stage: 'finali', bracket_code: 'F3', match_time: '21:40', court: 'A', status: 'programmata', is_event: false }, 
+      { stage: 'finali', bracket_code: 'F1', match_time: '22:10', court: 'A', status: 'programmata', is_event: false }, 
     ];
-
     await supabase.from('games').insert(playoffMatches);
     fetchData();
     showAlert("Generato!", "Il tabellone dei Playoff è stato generato in base agli incroci scelti e alla classifica attuale.");
@@ -236,44 +228,46 @@ export default function Home() {
     if (newStatus === 'in_corso' && game.status !== 'in_corso') {
       const liveCount = games.filter(g => g.status === 'in_corso').length;
       if (liveCount >= 2) {
-        showAlert("Limite Raggiunto", "Ci sono già 2 partite in corso. Chiudine una prima di avviarne un'altra.");
+        showAlert("Limite Raggiunto", "Ci sono già 2 partite/eventi in corso. Chiudine uno prima di avviarne un altro.");
         return;
       }
     }
 
-    if (newStatus === 'finita' && game.status !== 'finita') {
-      const homeWon = game.home_score > game.away_score;
-      const awayWon = game.away_score > game.home_score;
-      const winnerId = homeWon ? game.home_team_id : game.away_team_id;
-      const loserId = homeWon ? game.away_team_id : game.home_team_id;
+    if (!game.is_event) {
+      if (newStatus === 'finita' && game.status !== 'finita') {
+        const homeWon = game.home_score > game.away_score;
+        const awayWon = game.away_score > game.home_score;
+        const winnerId = homeWon ? game.home_team_id : game.away_team_id;
+        const loserId = homeWon ? game.away_team_id : game.home_team_id;
 
-      if (game.stage === 'girone' || !game.stage) {
-        const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
-        if (dbGame) {
-          const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
-          const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
-          if (homeTeam && awayTeam) {
-            await supabase.from('teams').update({ points: homeTeam.points + (homeWon ? 2 : 0), wins: homeTeam.wins + (homeWon ? 1 : 0), losses: homeTeam.losses + (awayWon ? 1 : 0), pf: homeTeam.pf + game.home_score, ps: homeTeam.ps + game.away_score }).eq('id', dbGame.home_team_id);
-            await supabase.from('teams').update({ points: awayTeam.points + (awayWon ? 2 : 0), wins: awayTeam.wins + (awayWon ? 1 : 0), losses: awayTeam.losses + (homeWon ? 1 : 0), pf: awayTeam.pf + game.away_score, ps: awayTeam.ps + game.home_score }).eq('id', dbGame.away_team_id);
+        if (game.stage === 'girone' || !game.stage) {
+          const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
+          if (dbGame) {
+            const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
+            const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
+            if (homeTeam && awayTeam) {
+              await supabase.from('teams').update({ points: homeTeam.points + (homeWon ? 2 : 0), wins: homeTeam.wins + (homeWon ? 1 : 0), losses: homeTeam.losses + (awayWon ? 1 : 0), pf: homeTeam.pf + game.home_score, ps: homeTeam.ps + game.away_score }).eq('id', dbGame.home_team_id);
+              await supabase.from('teams').update({ points: awayTeam.points + (awayWon ? 2 : 0), wins: awayTeam.wins + (awayWon ? 1 : 0), losses: awayTeam.losses + (homeWon ? 1 : 0), pf: awayTeam.pf + game.away_score, ps: awayTeam.ps + game.home_score }).eq('id', dbGame.away_team_id);
+            }
           }
+        } else {
+          await advancePlayoffTeam(game, winnerId, loserId);
         }
-      } else {
-        await advancePlayoffTeam(game, winnerId, loserId);
-      }
-    } 
-    
-    if (newStatus === 'in_corso' && game.status === 'finita') {
-      const homeWon = game.home_score > game.away_score;
-      const awayWon = game.away_score > game.home_score;
+      } 
       
-      if (game.stage === 'girone' || !game.stage) {
-        const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
-        if (dbGame) {
-          const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
-          const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
-          if (homeTeam && awayTeam) {
-            await supabase.from('teams').update({ points: Math.max(0, homeTeam.points - (homeWon ? 2 : 0)), wins: Math.max(0, homeTeam.wins - (homeWon ? 1 : 0)), losses: Math.max(0, homeTeam.losses - (awayWon ? 1 : 0)), pf: Math.max(0, homeTeam.pf - game.home_score), ps: Math.max(0, homeTeam.ps - game.away_score) }).eq('id', dbGame.home_team_id);
-            await supabase.from('teams').update({ points: Math.max(0, awayTeam.points - (awayWon ? 2 : 0)), wins: Math.max(0, awayTeam.wins - (awayWon ? 1 : 0)), losses: Math.max(0, awayTeam.losses - (homeWon ? 1 : 0)), pf: Math.max(0, awayTeam.pf - game.away_score), ps: Math.max(0, awayTeam.ps - game.home_score) }).eq('id', dbGame.away_team_id);
+      if (newStatus === 'in_corso' && game.status === 'finita') {
+        const homeWon = game.home_score > game.away_score;
+        const awayWon = game.away_score > game.home_score;
+        
+        if (game.stage === 'girone' || !game.stage) {
+          const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
+          if (dbGame) {
+            const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
+            const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
+            if (homeTeam && awayTeam) {
+              await supabase.from('teams').update({ points: Math.max(0, homeTeam.points - (homeWon ? 2 : 0)), wins: Math.max(0, homeTeam.wins - (homeWon ? 1 : 0)), losses: Math.max(0, homeTeam.losses - (awayWon ? 1 : 0)), pf: Math.max(0, homeTeam.pf - game.home_score), ps: Math.max(0, homeTeam.ps - game.away_score) }).eq('id', dbGame.home_team_id);
+              await supabase.from('teams').update({ points: Math.max(0, awayTeam.points - (awayWon ? 2 : 0)), wins: Math.max(0, awayTeam.wins - (awayWon ? 1 : 0)), losses: Math.max(0, awayTeam.losses - (homeWon ? 1 : 0)), pf: Math.max(0, awayTeam.pf - game.away_score), ps: Math.max(0, awayTeam.ps - game.home_score) }).eq('id', dbGame.away_team_id);
+            }
           }
         }
       }
@@ -284,22 +278,71 @@ export default function Home() {
 
   const saveQuickEdit = async () => {
     if (!gameToEdit) return;
-    await supabase.from('games').update({ match_time: gameToEdit.match_time, court: gameToEdit.court, home_team_id: gameToEdit.home_team_id || null, away_team_id: gameToEdit.away_team_id || null }).eq('id', gameToEdit.id);
+    await supabase.from('games').update({ 
+      match_time: gameToEdit.match_time, 
+      court: gameToEdit.court, 
+      home_team_id: gameToEdit.is_event ? null : (gameToEdit.home_team_id || null), 
+      away_team_id: gameToEdit.is_event ? null : (gameToEdit.away_team_id || null),
+      is_event: gameToEdit.is_event,
+      event_description: gameToEdit.event_description,
+      event_duration: gameToEdit.event_duration,
+      stage: gameToEdit.stage
+    }).eq('id', gameToEdit.id);
     setGameToEdit(null);
     fetchData();
   };
 
+  // --- MOTORE DI SCALAMENTO TEMPORALE ---
+  const addMinutesToTime = (timeStr: string, minsToAdd: number) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    const date = new Date();
+    date.setHours(h, m + minsToAdd, 0, 0);
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  };
+
   const createGame = async () => {
-    if (!newGame.home_id || !newGame.away_id) return;
-    await supabase.from('games').insert({ home_team_id: parseInt(newGame.home_id), away_team_id: parseInt(newGame.away_id), match_time: newGame.time, court: newGame.court, status: 'programmata', stage: 'girone' });
-    setNewGame({ home_id: '', away_id: '', time: '18:00', court: 'A' });
+    if (!newGame.is_event && (!newGame.home_id || !newGame.away_id)) return;
+    if (newGame.is_event && !newGame.event_description) return;
+
+    setLoading(true);
+    const duration = parseInt(newGame.event_duration) || 0;
+
+    // Se è un evento con durata, scala in avanti SOLO le partite dello STESSO GIORNO (stessa fase) e da quell'ora in poi
+    if (newGame.is_event && duration > 0) {
+      const isQualifiche = newGame.stage === 'girone';
+      
+      const gamesToShift = games.filter(g => {
+        const isGameQualifiche = !g.stage || g.stage === 'girone';
+        // Devono appartenere alla stessa giornata (Qualifiche = Qualifiche, Finali = Finali) e avere orario >= all'evento
+        return isQualifiche === isGameQualifiche && g.match_time >= newGame.time;
+      });
+
+      for (const g of gamesToShift) {
+        const newTime = addMinutesToTime(g.match_time, duration);
+        await supabase.from('games').update({ match_time: newTime }).eq('id', g.id);
+      }
+    }
+
+    await supabase.from('games').insert({ 
+      home_team_id: newGame.is_event ? null : parseInt(newGame.home_id), 
+      away_team_id: newGame.is_event ? null : parseInt(newGame.away_id), 
+      match_time: newGame.time, 
+      court: newGame.court, 
+      status: 'programmata', 
+      stage: newGame.stage, // Registriamo la fase scelta nel menu a tendina
+      is_event: newGame.is_event,
+      event_description: newGame.event_description,
+      event_duration: duration
+    });
+    
+    setNewGame({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
     setIsNewGameModalOpen(false);
     fetchData();
   };
 
   const deleteGame = (id: number) => {
     setGameToEdit(null);
-    setModal({ isOpen: true, title: "Elimina", message: "Cancellare questo match?", type: 'confirm', onConfirm: async () => { await supabase.from('games').delete().eq('id', id); fetchData(); closeModal(); } });
+    setModal({ isOpen: true, title: "Elimina", message: "Cancellare questo elemento dal calendario?", type: 'confirm', onConfirm: async () => { await supabase.from('games').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
   const saveTeamName = async () => {
@@ -361,7 +404,17 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {liveGames.length === 0 ? (
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
-                ) : liveGames.map(game => (
+                ) : liveGames.map(game => {
+                  if (game.is_event) {
+                    return (
+                      <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)] overflow-hidden min-h-[120px]">
+                        <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10">CAMPO {game.court}</div>
+                        <span className="text-3xl mb-2 animate-pulse">🔥</span>
+                        <p className="text-[14px] text-white font-black uppercase leading-tight text-center tracking-widest px-4">{game.event_description}</p>
+                      </div>
+                    );
+                  }
+                  return (
                     <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
                       <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10">CAMPO {game.court}</div>
                       <div className="flex flex-col justify-between text-center w-[40%] mt-4">
@@ -374,24 +427,35 @@ export default function Home() {
                         <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.away_score}</p>
                       </div>
                     </div>
-                  ))
-                }
+                  );
+                })}
               </div>
             </div>
 
             {nextGames.length > 0 && (
               <div>
-                <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossime Partite</h2>
+                <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossimi Eventi</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {nextGames.map(game => (
-                    <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
-                      <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
-                      <div className="text-right font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
-                      <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
-                      <div className="text-left font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                      <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
-                    </div>
-                  ))}
+                  {nextGames.map(game => {
+                    if (game.is_event) {
+                      return (
+                        <div key={game.id} className="grid grid-cols-[45px_1fr_25px] items-center gap-2 bg-slate-800/40 border border-pink-500/50 rounded-xl p-3 shadow-lg">
+                          <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
+                          <div className="text-center font-black text-pink-500 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
+                          <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
+                        <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
+                        <div className="text-right font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                        <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
+                        <div className="text-left font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                        <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -459,19 +523,30 @@ export default function Home() {
 
                 if (displayList.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px]">Nessun match trovato.</div>;
 
-                return displayList.map((game, i) => (
-                  <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                    <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
-                    <div className="text-right font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
-                    <div className="flex justify-center items-center px-1">
-                      {game.status === 'finita' ? (
-                        <div className="bg-slate-800 border-2 border-slate-700 px-1.5 py-0.5 rounded text-white font-black text-[10px] shadow-sm">{game.home_score}-{game.away_score}</div>
-                      ) : <div className="text-slate-600 font-black italic text-[9px]">VS</div>}
+                return displayList.map((game, i) => {
+                  if (game.is_event) {
+                    return (
+                      <div key={game.id} className={`grid grid-cols-[45px_1fr_25px] items-center gap-2 p-3 bg-slate-800/20 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                        <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
+                        <div className="text-center font-black text-pink-500 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
+                        <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                      <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
+                      <div className="text-right font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                      <div className="flex justify-center items-center px-1">
+                        {game.status === 'finita' ? (
+                          <div className="bg-slate-800 border-2 border-slate-700 px-1.5 py-0.5 rounded text-white font-black text-[10px] shadow-sm">{game.home_score}-{game.away_score}</div>
+                        ) : <div className="text-slate-600 font-black italic text-[9px]">VS</div>}
+                      </div>
+                      <div className="text-left font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                      <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
                     </div>
-                    <div className="text-left font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                    <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
-                  </div>
-                ));
+                  );
+                });
               })()}
             </div>
           </section>
@@ -499,30 +574,33 @@ export default function Home() {
                         {stage === 'finali' ? 'FINALI' : stage}
                       </div>
                       
-                      {stageGames.map((game, i) => (
-                        <div key={game.id} className="bg-slate-900 border-2 border-cyan-500 rounded-xl p-4 flex flex-col justify-between relative shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]">
-                          <div className="absolute top-0 left-0 bg-cyan-500 text-slate-900 font-black text-[8px] px-2 py-1 rounded-br-lg rounded-tl-[10px] uppercase">MATCH {game.bracket_code}</div>
-                          <div className="absolute top-0 right-0 bg-slate-800 text-slate-400 font-black text-[8px] px-2 py-1 rounded-bl-lg rounded-tr-[10px] uppercase">{game.match_time} | C.{game.court}</div>
-                          
-                          <div className="mt-4 flex justify-between items-center w-full">
-                            <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.home_team ? 'text-slate-200' : 'text-slate-600 italic'}`}>
-                              {renderTeamName(game.home_team, game.bracket_code, true)}
-                            </span>
-                            <span className={`text-2xl font-black ${game.home_team ? 'text-white' : 'text-slate-700'}`}>{game.home_score}</span>
+                      {stageGames.map((game, i) => {
+                        if(game.is_event) return null; 
+                        return (
+                          <div key={game.id} className="bg-slate-900 border-2 border-cyan-500 rounded-xl p-4 flex flex-col justify-between relative shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]">
+                            <div className="absolute top-0 left-0 bg-cyan-500 text-slate-900 font-black text-[8px] px-2 py-1 rounded-br-lg rounded-tl-[10px] uppercase">MATCH {game.bracket_code}</div>
+                            <div className="absolute top-0 right-0 bg-slate-800 text-slate-400 font-black text-[8px] px-2 py-1 rounded-bl-lg rounded-tr-[10px] uppercase">{game.match_time} | C.{game.court}</div>
+                            
+                            <div className="mt-4 flex justify-between items-center w-full">
+                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.home_team ? 'text-slate-200' : 'text-slate-600 italic'}`}>
+                                {renderTeamName(game.home_team, game.bracket_code, true)}
+                              </span>
+                              <span className={`text-2xl font-black ${game.home_team ? 'text-white' : 'text-slate-700'}`}>{game.home_score}</span>
+                            </div>
+                            
+                            <div className="w-full h-px bg-slate-800 my-3 relative">
+                              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900 px-2 text-[9px] font-black text-pink-500 italic">VS</span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center w-full">
+                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.away_team ? 'text-slate-200' : 'text-slate-600 italic'}`}>
+                                {renderTeamName(game.away_team, game.bracket_code, false)}
+                              </span>
+                              <span className={`text-2xl font-black ${game.away_team ? 'text-white' : 'text-slate-700'}`}>{game.away_score}</span>
+                            </div>
                           </div>
-                          
-                          <div className="w-full h-px bg-slate-800 my-3 relative">
-                            <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900 px-2 text-[9px] font-black text-pink-500 italic">VS</span>
-                          </div>
-                          
-                          <div className="flex justify-between items-center w-full">
-                            <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.away_team ? 'text-slate-200' : 'text-slate-600 italic'}`}>
-                              {renderTeamName(game.away_team, game.bracket_code, false)}
-                            </span>
-                            <span className={`text-2xl font-black ${game.away_team ? 'text-white' : 'text-slate-700'}`}>{game.away_score}</span>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )
                 })}
@@ -551,7 +629,7 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[80px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
             </div>
 
-            {/* LIVE CONTROL */}
+            {/* LIVE CONTROL (ORDINATO E FILTRATO PER FASE) */}
             {activeAdminSubTab === 'live' && (
               <div className="space-y-4 pb-20">
                 
@@ -564,72 +642,94 @@ export default function Home() {
                   {(() => {
                     const filteredLiveGames = adminLiveGames.filter(g => activeScheduleTab === 'qualifiche' ? (!g.stage || g.stage === 'girone') : (g.stage && g.stage !== 'girone'));
 
-                    if (filteredLiveGames.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun match in questa fase.</div>;
+                    if (filteredLiveGames.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun evento in questa fase.</div>;
 
-                    return filteredLiveGames.map(game => (
-                      <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
-                        game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 
-                        game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-slate-700'
-                      }`}>
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
-                          {game.status === 'finita' && (
-                            <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}>
-                              <span>↺</span> Riapri
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="flex justify-between items-stretch bg-black p-3 rounded-lg mb-3">
-                          <div className="flex flex-col justify-between text-center w-[35%]">
-                            <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team?.name || 'TBD'}</p>
-                            <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
+                    return filteredLiveGames.map(game => {
+                      if (game.is_event) {
+                        return (
+                          <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all ${game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]' : game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-pink-500/50'}`}>
+                             <div className="flex justify-between items-center mb-3">
+                               <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
+                               {game.status === 'finita' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}><span>↺</span> Riapri</button>}
+                             </div>
+                             <div className="flex flex-col items-center justify-center bg-black p-4 rounded-lg mb-3 min-h-[80px]">
+                               <span className="text-2xl mb-1">🔥</span>
+                               <p className="text-[12px] font-black uppercase text-pink-500 tracking-widest text-center">{game.event_description}</p>
+                             </div>
+                             <div className="flex justify-center px-1">
+                               {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-black text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-opacity ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : ''}`}>Avvia Evento</button>}
+                               {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest">Chiudi Evento</button>}
+                               {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Evento Terminato</span>}
+                             </div>
                           </div>
-                          
-                          <div className="flex flex-col justify-center text-center w-[30%] px-1">
-                            {game.status === 'programmata' && (
-                              <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2 || (!game.home_team_id || !game.away_team_id)} className={`bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-opacity ${(activeLiveGamesCount >= 2 || !game.home_team_id || !game.away_team_id) ? 'opacity-30 cursor-not-allowed' : ''}`}>
-                                Avvia
+                        );
+                      }
+
+                      return (
+                        <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
+                          game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 
+                          game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-slate-700'
+                        }`}>
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
+                            {game.status === 'finita' && (
+                              <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}>
+                                <span>↺</span> Riapri
                               </button>
                             )}
-                            {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
-                            {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
                           </div>
 
-                          <div className="flex flex-col justify-between text-center w-[35%]">
-                            <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team?.name || 'TBD'}</p>
-                            <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
+                          <div className="flex justify-between items-stretch bg-black p-3 rounded-lg mb-3">
+                            <div className="flex flex-col justify-between text-center w-[35%]">
+                              <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team?.name || 'TBD'}</p>
+                              <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
+                            </div>
+                            
+                            <div className="flex flex-col justify-center text-center w-[30%] px-1">
+                              {game.status === 'programmata' && (
+                                <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2 || (!game.home_team_id || !game.away_team_id)} className={`bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-opacity ${(activeLiveGamesCount >= 2 || !game.home_team_id || !game.away_team_id) ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                  Avvia
+                                </button>
+                              )}
+                              {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
+                              {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
+                            </div>
+
+                            <div className="flex flex-col justify-between text-center w-[35%]">
+                              <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team?.name || 'TBD'}</p>
+                              <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
+                            </div>
                           </div>
+
+                          {game.status === 'in_corso' && (
+                            <div className="flex justify-between items-center w-full gap-2 mt-2">
+                              <div className="flex gap-1">
+                                <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
+                                <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
+                                <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
+                                <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                              </div>
+                              <span className="text-[10px] text-slate-600 font-black italic">VS</span>
+                              <div className="flex gap-1">
+                                <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
+                                <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
+                                <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
+                                <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-
-                        {game.status === 'in_corso' && (
-                          <div className="flex justify-between items-center w-full gap-2 mt-2">
-                            <div className="flex gap-1">
-                              <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
-                              <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
-                              <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
-                              <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
-                            </div>
-                            <span className="text-[10px] text-slate-600 font-black italic">VS</span>
-                            <div className="flex gap-1">
-                              <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
-                              <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
-                              <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
-                              <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ));
+                      );
+                    });
                   })()}
                 </div>
               </div>
             )}
 
-            {/* ORARI ADMIN DIVISO IN DUE TAB */}
+            {/* ORARI ADMIN DIVISO IN DUE TAB CON EVENTI SUPPORTATI */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4 pb-20">
-                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Partita</button>
+                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Voce Calendario</button>
                 
                 <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 mb-6">
                   <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>Qualifiche</button>
@@ -644,22 +744,35 @@ export default function Home() {
                     
                     const displayList = (activeScheduleTab === 'finali' && list.length === 0) ? dummyFinals : list;
 
-                    if (displayList.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px]">Nessun match trovato.</div>;
+                    if (displayList.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px]">Nessun elemento in calendario.</div>;
 
-                    return displayList.map((game, i) => (
-                      <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 hover:bg-slate-800/30 transition-colors ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                        <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
-                        <span className="text-[10px] font-black uppercase text-slate-200 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
-                        <span className="text-[8px] text-slate-600 italic font-black px-1">VS</span>
-                        <span className="text-[10px] font-black uppercase text-slate-200 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
-                        <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
-                        {game.id.toString().startsWith('d') ? (
-                          <span className="w-8"></span> // Niente bottone edit per match fittizi
-                        ) : (
-                          <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right">✏️</button>
-                        )}
-                      </div>
-                    ));
+                    return displayList.map((game, i) => {
+                      if (game.is_event) {
+                        return (
+                          <div key={game.id} className={`grid grid-cols-[45px_1fr_25px_30px] items-center gap-2 p-3 hover:bg-slate-800/30 transition-colors bg-slate-800/20 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                            <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
+                            <span className="text-[11px] font-black uppercase text-pink-500 text-center tracking-widest break-words">{game.event_description}</span>
+                            <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
+                            <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right">✏️</button>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 hover:bg-slate-800/30 transition-colors ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                          <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
+                          <span className="text-[10px] font-black uppercase text-slate-200 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
+                          <span className="text-[8px] text-slate-600 italic font-black px-1">VS</span>
+                          <span className="text-[10px] font-black uppercase text-slate-200 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
+                          <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
+                          {game.id.toString().startsWith('d') ? (
+                            <span className="w-8"></span> 
+                          ) : (
+                            <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right">✏️</button>
+                          )}
+                        </div>
+                      );
+                    });
                   })()}
                 </div>
               </div>
@@ -781,22 +894,50 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALI CREA --- */}
+      {/* --- MODALE CREA GIOCO/EVENTO --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Crea Partita</h3>
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Crea Calendario</h3>
             <div className="space-y-4 mb-8">
-              <div className="grid grid-cols-1 gap-3">
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              
+              <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                <input type="checkbox" id="isEventToggle" checked={newGame.is_event} onChange={(e) => setNewGame({...newGame, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
+                <label htmlFor="isEventToggle" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">Evento Speciale (Es. 3pt Contest)</label>
               </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Fase / Giorno</label>
+                <select value={newGame.stage} onChange={(e) => setNewGame({...newGame, stage: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black mb-3">
+                  <option value="girone">Giorno 1 - Qualifiche</option>
+                  <option value="finali">Giorno 2 - Playoff/Finali</option>
+                </select>
+              </div>
+
+              {newGame.is_event ? (
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Nome Evento</label>
+                    <input type="text" placeholder="Es. GARA DA 3 PUNTI" value={newGame.event_description} onChange={(e) => setNewGame({...newGame, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase placeholder-slate-600" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in minuti (slitta i successivi)</label>
+                    <input type="number" placeholder="Es. 30" value={newGame.event_duration} onChange={(e) => setNewGame({...newGame, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
                   <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
                   <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
                     <option value="A">A</option>
@@ -806,31 +947,57 @@ export default function Home() {
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-cyan-500/20 tracking-widest font-black">Conferma e Crea</button>
+              <button onClick={createGame} className={`text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black ${newGame.is_event ? 'bg-pink-500 shadow-pink-500/20' : 'bg-cyan-500 shadow-cyan-500/20'}`}>Conferma e Crea</button>
               <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest font-black">Annulla</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* QUICK EDIT MODAL */}
+      {/* --- MODALE EDIT GIOCO/EVENTO --- */}
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Modifica Partita {gameToEdit.bracket_code ? `(${gameToEdit.bracket_code})` : ''}</h3>
+            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Modifica {gameToEdit.is_event ? 'Evento' : `Partita ${gameToEdit.bracket_code ? `(${gameToEdit.bracket_code})` : ''}`}</h3>
             <div className="space-y-4 mb-8">
               
-              <div className="grid grid-cols-1 gap-2">
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Casa</label><select value={gameToEdit.home_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, home_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Ospite</label><select value={gameToEdit.away_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, away_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+              <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                <input type="checkbox" id="isEventToggleEdit" checked={gameToEdit.is_event} onChange={(e) => setGameToEdit({...gameToEdit, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
+                <label htmlFor="isEventToggleEdit" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">Evento Speciale</label>
               </div>
 
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Fase / Giorno</label>
+                <select value={gameToEdit.stage === 'girone' || !gameToEdit.stage ? 'girone' : 'finali'} onChange={(e) => setGameToEdit({...gameToEdit, stage: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black mb-3">
+                  <option value="girone">Giorno 1 - Qualifiche</option>
+                  <option value="finali">Giorno 2 - Playoff/Finali</option>
+                </select>
+              </div>
+
+              {gameToEdit.is_event ? (
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Nome Evento</label>
+                    <input type="text" placeholder="Es. GARA DA 3 PUNTI" value={gameToEdit.event_description || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase placeholder-slate-600" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in minuti</label>
+                    <input type="number" placeholder="Es. 30" value={gameToEdit.event_duration || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2">
+                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Casa</label><select value={gameToEdit.home_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, home_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Ospite</label><select value={gameToEdit.away_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, away_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
                   <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
                   <select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
                     <option value="A">A</option>
@@ -841,7 +1008,7 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-3">
               <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
-              <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina Match</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
+              <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
             </div>
           </div>
         </div>
