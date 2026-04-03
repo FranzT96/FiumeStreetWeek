@@ -45,33 +45,26 @@ export default function Home() {
 
   const closeModal = () => setModal({ ...modal, isOpen: false });
 
-  // --- REATTIVITÀ OTTIMISTICA PER IL PUNTEGGIO ---
+  // --- SCORE LOGIC (OPTIMISTIC) ---
   const updateScore = async (gameId: number, teamType: 'home' | 'away', pointsToAdd: number, currentScore: number) => {
     const field = teamType === 'home' ? 'home_score' : 'away_score';
     const newScore = Math.max(0, currentScore + pointsToAdd);
-
-    // Aggiornamento Locale Istantaneo (Optimistic UI)
     setGames(prev => prev.map(g => g.id === gameId ? { ...g, [field]: newScore } : g));
-
-    // Aggiornamento DB
     await supabase.from('games').update({ [field]: newScore }).eq('id', gameId);
   };
 
-  // --- LOGICA CHIUSURA / RIAPERTURA ---
+  // --- STATUS LOGIC (FINISH / REOPEN) ---
   const updateStatus = async (gameId: number, newStatus: string) => {
     const game = games.find(g => g.id === gameId);
     if (!game) return;
 
-    // Se stiamo CHIUDENDO la partita (Aggiunta punti)
     if (newStatus === 'finita' && game.status !== 'finita') {
       const homeWon = game.home_score > game.away_score;
       const awayWon = game.away_score > game.home_score;
       const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
-
       if (dbGame) {
         const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
         const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
-
         if (homeTeam && awayTeam) {
           await supabase.from('teams').update({ points: homeTeam.points + (homeWon ? 2 : 0), wins: homeTeam.wins + (homeWon ? 1 : 0), losses: homeTeam.losses + (awayWon ? 1 : 0), pf: homeTeam.pf + game.home_score, ps: homeTeam.ps + game.away_score }).eq('id', dbGame.home_team_id);
           await supabase.from('teams').update({ points: awayTeam.points + (awayWon ? 2 : 0), wins: awayTeam.wins + (awayWon ? 1 : 0), losses: awayTeam.losses + (homeWon ? 1 : 0), pf: awayTeam.pf + game.away_score, ps: awayTeam.ps + game.home_score }).eq('id', dbGame.away_team_id);
@@ -79,23 +72,19 @@ export default function Home() {
       }
     } 
     
-    // Se stiamo RIAPERTO la partita (Storno punti)
     if (newStatus === 'in_corso' && game.status === 'finita') {
       const homeWon = game.home_score > game.away_score;
       const awayWon = game.away_score > game.home_score;
       const { data: dbGame } = await supabase.from('games').select('home_team_id, away_team_id').eq('id', gameId).single();
-
       if (dbGame) {
         const { data: homeTeam } = await supabase.from('teams').select('*').eq('id', dbGame.home_team_id).single();
         const { data: awayTeam } = await supabase.from('teams').select('*').eq('id', dbGame.away_team_id).single();
-
         if (homeTeam && awayTeam) {
           await supabase.from('teams').update({ points: Math.max(0, homeTeam.points - (homeWon ? 2 : 0)), wins: Math.max(0, homeTeam.wins - (homeWon ? 1 : 0)), losses: Math.max(0, homeTeam.losses - (awayWon ? 1 : 0)), pf: Math.max(0, homeTeam.pf - game.home_score), ps: Math.max(0, homeTeam.ps - game.away_score) }).eq('id', dbGame.home_team_id);
           await supabase.from('teams').update({ points: Math.max(0, awayTeam.points - (awayWon ? 2 : 0)), wins: Math.max(0, awayTeam.wins - (awayWon ? 1 : 0)), losses: Math.max(0, awayTeam.losses - (homeWon ? 1 : 0)), pf: Math.max(0, awayTeam.pf - game.away_score), ps: Math.max(0, awayTeam.ps - game.home_score) }).eq('id', dbGame.away_team_id);
         }
       }
     }
-
     await supabase.from('games').update({ status: newStatus }).eq('id', gameId);
     fetchData();
   };
@@ -145,11 +134,11 @@ export default function Home() {
     setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
-  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse">Live Sync...</div>;
+  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione...</div>;
 
-  const liveGames = games.filter(g => g.status === 'in_corso');
-  const scheduledGames = games.filter(g => g.status === 'programmata');
-  const finishedGames = games.filter(g => g.status === 'finita');
+  // LOGICHE DI VISUALIZZAZIONE HOME
+  const liveGames = games.filter(g => g.status === 'in_corso').slice(0, 2);
+  const nextGames = games.filter(g => g.status === 'programmata').slice(0, 2);
 
   return (
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24">
@@ -165,26 +154,48 @@ export default function Home() {
           </div>
         )}
 
-        {/* --- HOME --- */}
+        {/* --- HOME TAB --- */}
         {activeTab === 'home' && (
           <section className="animate-fade-in space-y-8">
-            <h2 className="text-xl font-black text-pink-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic"><span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {liveGames.length === 0 ? <p className="text-slate-500 font-black uppercase text-xs italic tracking-widest p-4">Nessun match in corso...</p> : 
-                liveGames.map(game => (
-                  <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]">
-                    <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
-                    <div className="text-center w-2/5"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
-                    <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse">VS</div>
-                    <div className="text-center w-2/5"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
-                  </div>
-                ))
-              }
+            <div>
+              <h2 className="text-xl font-black text-pink-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic mb-4">
+                <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {liveGames.length === 0 ? (
+                  <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
+                ) : liveGames.map(game => (
+                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]">
+                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-2 py-1 rounded-bl-lg uppercase">CAMPO {game.court}</div>
+                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.home_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.home_score}</p></div>
+                      <div className="text-center w-1/5 text-pink-500 font-black italic animate-pulse mt-2">VS</div>
+                      <div className="text-center w-2/5 mt-2"><p className="text-[10px] text-cyan-400 font-black uppercase mb-1 truncate">{game.away_team.name}</p><p className="text-4xl sm:text-5xl font-black text-white">{game.away_score}</p></div>
+                    </div>
+                  ))
+                }
+              </div>
             </div>
+
+            {nextGames.length > 0 && (
+              <div>
+                <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossime Partite</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {nextGames.map(game => (
+                    <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-2 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
+                      <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
+                      <div className="text-right font-bold text-slate-300 text-[10px] uppercase truncate">{game.home_team.name}</div>
+                      <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
+                      <div className="text-left font-bold text-slate-300 text-[10px] uppercase truncate">{game.away_team.name}</div>
+                      <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-        {/* --- GIRONI --- */}
+        {/* --- ALTRI TAB PUBBLICI (GIRONI, CALENDARIO) --- */}
         {activeTab === 'gironi' && (
           <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
             {groups.map((group) => (
@@ -194,13 +205,8 @@ export default function Home() {
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
                     <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer">
                       <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none">
-                        <div className="flex items-center gap-2 w-1/2">
-                          <span className="text-orange-500 font-black text-xs">{index + 1}.</span>
-                          <span className="uppercase text-[10px] font-black truncate">{team.name}</span>
-                        </div>
-                        <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono">
-                          <span className="text-slate-400 w-4">{team.wins}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-orange-400 w-6 font-black">{team.points}</span>
-                        </div>
+                        <div className="flex items-center gap-2 w-1/2"><span className="text-orange-500 font-black text-xs">{index + 1}.</span><span className="uppercase text-[10px] font-black truncate">{team.name}</span></div>
+                        <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono"><span className="text-slate-400 w-4">{team.wins}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-orange-400 w-6 font-black">{team.points}</span></div>
                       </summary>
                       <div className="p-3 bg-slate-900/80 border-t border-slate-700">
                         <ul className="grid grid-cols-2 gap-2">
@@ -217,7 +223,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- CALENDARIO PUBBLICO --- */}
         {activeTab === 'calendario' && (
           <section className="animate-fade-in pt-4 bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
             {games.map((game, i) => (
@@ -246,33 +251,35 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('roster')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
             </div>
 
-            {/* LIVE CONTROL (REATTIVO) */}
+            {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
               <div className="grid grid-cols-1 gap-6 pb-20">
                 {games.filter(g => g.status !== 'programmata').map(game => (
-                  <div key={game.id} className={`bg-slate-900 p-4 rounded-2xl border-2 shadow-2xl ${game.status === 'in_corso' ? 'border-pink-500' : 'border-slate-800 opacity-60 grayscale-[0.5]'}`}>
+                  <div key={game.id} className={`bg-slate-900 p-4 rounded-2xl border-2 shadow-2xl ${game.status === 'in_corso' ? 'border-pink-500' : 'border-slate-800 opacity-60'}`}>
                     <div className="flex justify-between items-center bg-black p-4 rounded-xl mb-4 relative overflow-hidden">
                       {game.status === 'finita' && <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10"><button onClick={() => updateStatus(game.id, 'in_corso')} className="bg-white text-black font-black px-4 py-2 rounded-lg text-xs tracking-widest shadow-xl">RIAPRI MATCH 🔄</button></div>}
                       <div className="text-center w-1/3"><p className="text-[9px] text-slate-500 uppercase truncate">{game.home_team.name}</p><p className="text-4xl font-black text-white">{game.home_score}</p></div>
                       <div className="text-center w-1/3">
                         <span className="text-[8px] font-black text-cyan-400 block mb-2 uppercase tracking-widest">{game.status.replace('_', ' ')}</span>
-                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-2 rounded-lg w-full shadow-lg shadow-pink-500/20">CHIUDI MATCH 🔒</button>}
+                        {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-4 py-2 rounded-lg w-full shadow-lg">CHIUDI MATCH 🔒</button>}
                       </div>
                       <div className="text-center w-1/3"><p className="text-[9px] text-slate-500 uppercase truncate">{game.away_team.name}</p><p className="text-4xl font-black text-white">{game.away_score}</p></div>
                     </div>
                     {game.status === 'in_corso' && (
-                      <div className="flex justify-between gap-4 px-2">
-                        <div className="flex flex-wrap gap-2 w-1/2">
-                          <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">-1</button>
-                          <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+1</button>
-                          <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+2</button>
-                          <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="bg-orange-500/20 text-orange-400 border border-orange-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+3</button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 w-1/2 justify-end">
-                          <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">-1</button>
-                          <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+1</button>
-                          <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+2</button>
-                          <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="bg-orange-500/20 text-orange-400 border border-orange-400/50 font-black w-10 h-10 rounded-xl text-xs active:scale-90 transition-transform">+3</button>
+                      <div className="flex flex-col gap-4">
+                        <div className="flex justify-between gap-1 items-center bg-slate-800/30 p-2 rounded-xl">
+                          <div className="flex gap-1.5">
+                            <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs">-1</button>
+                            <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+1</button>
+                            <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+2</button>
+                            <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+3</button>
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="bg-red-600/20 text-red-500 border border-red-500/50 font-black w-10 h-10 rounded-xl text-xs">-1</button>
+                            <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+1</button>
+                            <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+2</button>
+                            <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 font-black w-10 h-10 rounded-xl text-xs">+3</button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -280,13 +287,13 @@ export default function Home() {
                 ))}
                 {games.filter(g => g.status === 'programmata').length > 0 && (
                   <div className="bg-slate-800/40 p-4 rounded-xl border border-dashed border-slate-700 text-center">
-                    <p className="text-slate-500 text-[10px] uppercase font-black mb-4 tracking-widest">Partite in attesa</p>
+                    <p className="text-slate-500 text-[10px] uppercase font-black mb-4 tracking-widest italic">Partite in attesa</p>
                     <div className="space-y-2">
                       {games.filter(g => g.status === 'programmata').map(g => (
                         <button key={g.id} onClick={() => updateStatus(g.id, 'in_corso')} className="w-full bg-slate-900 p-3 rounded-lg flex justify-between items-center hover:bg-cyan-500 group transition-all">
                           <span className="font-mono text-xs text-cyan-400 group-hover:text-black">{g.match_time}</span>
                           <span className="text-[10px] font-black uppercase group-hover:text-black">{g.home_team.name} vs {g.away_team.name}</span>
-                          <span className="bg-orange-500 text-black text-[9px] px-2 py-1 rounded font-black">START</span>
+                          <span className="bg-orange-500 text-black text-[9px] px-2 py-1 rounded font-black shadow-sm">START</span>
                         </button>
                       ))}
                     </div>
@@ -297,7 +304,7 @@ export default function Home() {
 
             {/* ORARI ADMIN */}
             {activeAdminSubTab === 'orari' && (
-              <div className="space-y-4">
+              <div className="space-y-4 pb-20">
                 <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Partita</button>
                 <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
                   {games.map(game => (
@@ -316,7 +323,7 @@ export default function Home() {
 
             {/* ROSTER ADMIN */}
             {activeAdminSubTab === 'roster' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                 {groups.map((group) => (
                   <div key={group} className="bg-slate-900 rounded-2xl border-2 border-slate-800 overflow-hidden shadow-xl">
                     <div className="bg-slate-800/50 p-2 text-center border-b border-slate-700"><h3 className="text-xs font-black uppercase text-orange-500 tracking-widest italic">Girone {group}</h3></div>
@@ -326,7 +333,7 @@ export default function Home() {
                           <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none cursor-pointer hover:bg-slate-800/50 transition-all">
                             {editingTeam?.id === team.id ? (
                               <div className="flex gap-1 w-full" onClick={(e) => e.stopPropagation()}>
-                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none font-black" autoFocus />
+                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none" autoFocus />
                                 <button onClick={saveTeamName} className="bg-cyan-500 text-black px-3 rounded text-[9px] font-black uppercase">Ok</button>
                               </div>
                             ) : (
@@ -338,7 +345,7 @@ export default function Home() {
                               {team.players.map((p: any) => (
                                 <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
                                   {editingPlayer?.id === p.id ? (
-                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none font-black" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase font-black">Ok</button></div>
+                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase">Ok</button></div>
                                   ) : (
                                     <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500 transition-colors">❌</button></div></>
                                   )}
@@ -346,8 +353,8 @@ export default function Home() {
                               ))}
                             </ul>
                             <div className="flex gap-1.5 pt-2">
-                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500 font-black tracking-tighter" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
-                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter shadow-md">Aggiungi</button>
+                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500 font-black" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
+                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter">Aggiungi</button>
                             </div>
                           </div>
                         </details>
@@ -363,14 +370,14 @@ export default function Home() {
 
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-lg mx-auto p-2">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/4 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Live</span></button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/4 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Gironi</span></button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/4 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest font-black">Orari</span></button>
-          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white font-black">Admin</span></button>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center w-1/4 ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}><span className="text-xl mb-1">🔥</span><span className="text-[8px] font-black uppercase italic tracking-widest">Live</span></button>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center w-1/4 ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}><span className="text-xl mb-1">📊</span><span className="text-[8px] font-black uppercase italic tracking-widest">Gironi</span></button>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center w-1/4 ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}><span className="text-xl mb-1">📅</span><span className="text-[8px] font-black uppercase italic tracking-widest">Orari</span></button>
+          <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center w-1/4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}><span className="text-xl mb-1">⚙️</span><span className="text-[8px] font-black uppercase italic tracking-widest text-white">Admin</span></button>
         </div>
       </nav>
 
-      {/* --- MODALE NUOVA PARTITA --- */}
+      {/* MODALI NUOVA PARTITA / EDIT / CONFERMA */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -386,14 +393,13 @@ export default function Home() {
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-cyan-500/20 tracking-widest font-black">Conferma e Crea</button>
+              <button onClick={createGame} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-cyan-500/20 tracking-widest">Conferma e Crea</button>
               <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest">Annulla</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODALE EDIT --- */}
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -411,7 +417,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE CONFERMA --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
