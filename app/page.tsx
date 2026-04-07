@@ -20,9 +20,10 @@ export default function Home() {
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
 
-  // --- STATI PER AUTH, EASTER EGG E IMPOSTAZIONI PLAYOFF ---
+  // --- STATI PER AUTH, EASTER EGG, IMPOSTAZIONI PLAYOFF E MENU ADMIN ---
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
@@ -96,6 +97,13 @@ export default function Home() {
     else { setIsAdminUnlocked(true); setIsLoginModalOpen(false); setActiveTab('admin'); setEmail(''); setPassword(''); }
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setIsAdminUnlocked(false);
+    setIsAdminMenuOpen(false);
+    setActiveTab('home');
+  };
+
   const resetTournament = () => {
     setModal({
       isOpen: true,
@@ -138,7 +146,7 @@ export default function Home() {
 
   const generateBracket = async () => {
     if (games.some(g => g.stage && g.stage !== 'girone')) {
-      showAlert("Attenzione", "I Playoff sono già stati generati! Se vuoi rigenerarli, premi il bidoncino 🗑️ nel tab Live per azzerare tutto e ricalcolare gli incroci.");
+      showAlert("Attenzione", "I Playoff sono già stati generati! Se vuoi rigenerarli, apri il menu ⋮ e usa 'Azzera Torneo' per ricalcolare gli incroci.");
       return;
     }
     setLoading(true);
@@ -301,8 +309,8 @@ export default function Home() {
     if (!newGame.is_event && (!newGame.home_id || !newGame.away_id)) return;
     if (newGame.is_event && !newGame.event_description) return;
 
-    // Chiudiamo IMMEDIATAMENTE la modale per l'esperienza turbo fluida
-    setIsNewGameModalOpen(false);
+    setIsNewGameModalOpen(false); // Chiusura immediata
+    setLoading(true);
     
     const duration = parseInt(newGame.event_duration) || 0;
 
@@ -435,20 +443,20 @@ export default function Home() {
                   {nextGames.map(game => {
                     if (game.is_event) {
                       return (
-                        <div key={game.id} className="grid grid-cols-[45px_1fr_25px] items-center gap-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl p-3 shadow-lg">
+                        <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl p-3 shadow-lg">
                           <div className="font-mono font-black text-orange-400 text-xs">{game.match_time}</div>
                           <div className="text-center font-black text-pink-300 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                          <div className="flex justify-center"><span className="bg-pink-500 text-white font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                          <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-sm">{game.court}</span></div>
                         </div>
                       );
                     }
                     return (
-                      <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
+                      <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
                         <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
                         <div className="text-right font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
                         <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
                         <div className="text-left font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                        <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[10px] px-1.5 py-0.5 rounded shadow-sm">{game.court}</span></div>
+                        <div className="flex justify-end pr-1"><span className="bg-orange-500 text-black font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-sm">{game.court}</span></div>
                       </div>
                     );
                   })}
@@ -500,7 +508,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- CALENDARIO PUBBLICO (ORARI DIVISI IN TAB) --- */}
+        {/* --- CALENDARIO PUBBLICO --- */}
         {activeTab === 'calendario' && (
           <section className="animate-fade-in space-y-4 pt-4">
             
@@ -522,15 +530,15 @@ export default function Home() {
                 return displayList.map((game, i) => {
                   if (game.is_event) {
                     return (
-                      <div key={game.id} className="grid grid-cols-[45px_1fr_25px] items-center gap-2 p-3 mx-2 my-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl shadow-lg">
+                      <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 p-3 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border-b border-slate-800 last:border-0">
                         <div className="font-mono font-black text-orange-400 text-[10px]">{game.match_time}</div>
-                        <div className="text-center font-black text-pink-400 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                        <div className="flex justify-center"><span className="bg-pink-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                        <div className="text-center font-black text-pink-400 text-[11px] uppercase leading-tight tracking-widest break-words px-2">{game.event_description}</div>
+                        <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-sm">{game.court}</span></div>
                       </div>
                     );
                   }
                   return (
-                    <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                    <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
                       <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
                       <div className="text-right font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
                       <div className="flex justify-center items-center px-1">
@@ -539,7 +547,7 @@ export default function Home() {
                         ) : <div className="text-slate-600 font-black italic text-[9px]">VS</div>}
                       </div>
                       <div className="text-left font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                      <div className="flex justify-center"><span className="bg-orange-500 text-black font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                      <div className="flex justify-end pr-1"><span className="bg-orange-500 text-black font-black text-[10px] w-6 h-6 flex items-center justify-center rounded">{game.court}</span></div>
                     </div>
                   );
                 });
@@ -609,13 +617,29 @@ export default function Home() {
         {activeTab === 'admin' && isAdminUnlocked && (
           <section className="animate-fade-in space-y-6">
             
-            <div className="flex justify-between items-end border-b-2 border-orange-500 pb-2 pt-4">
+            <div className="flex justify-between items-center border-b-2 border-orange-500 pb-2 pt-4 relative">
               <h2 className="text-2xl font-black text-orange-500 uppercase italic m-0 leading-none">Control Panel</h2>
-              {activeAdminSubTab === 'live' && (
-                <button onClick={resetTournament} className="bg-slate-800 text-slate-400 border border-slate-700 p-2 rounded-lg hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center shadow-lg" title="Azzera Punteggi e Playoff">
-                  🗑️
+              <div className="relative">
+                <button 
+                  onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)} 
+                  className="bg-slate-800 text-slate-400 border border-slate-700 w-9 h-9 rounded-lg hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center shadow-lg text-lg pb-1"
+                >
+                  ⋮
                 </button>
-              )}
+                {isAdminMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsAdminMenuOpen(false)}></div>
+                    <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
+                      <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
+                        <span className="text-sm">🗑️</span> Azzera Torneo
+                      </button>
+                      <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
+                        <span className="text-sm">🚪</span> Logout Admin
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800 overflow-x-auto hide-scrollbar">
@@ -625,7 +649,7 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[80px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
             </div>
 
-            {/* LIVE CONTROL (ORDINATO E FILTRATO PER FASE) */}
+            {/* LIVE CONTROL (ORDINATO E FILTRATO) */}
             {activeAdminSubTab === 'live' && (
               <div className="space-y-4 pb-20">
                 
@@ -648,9 +672,9 @@ export default function Home() {
                                <span className="text-[10px] text-slate-300 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
                                {game.status === 'finita' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}><span>↺</span> Riapri</button>}
                              </div>
-                             <div className="flex flex-col items-center justify-center bg-black/60 p-4 rounded-lg mb-3 min-h-[80px]">
+                             <div className="flex flex-col items-center justify-center bg-black/60 p-4 rounded-lg mb-3 min-h-[80px] text-center">
                                <span className="text-2xl mb-1">🔥</span>
-                               <p className="text-[12px] font-black uppercase text-pink-400 tracking-widest text-center">{game.event_description}</p>
+                               <p className="text-[12px] font-black uppercase text-pink-400 tracking-widest">{game.event_description}</p>
                              </div>
                              <div className="flex justify-center px-1">
                                {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-black text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-opacity ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : ''}`}>Avvia Evento</button>}
@@ -745,22 +769,22 @@ export default function Home() {
                     return displayList.map((game, i) => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className={`grid grid-cols-[45px_1fr_25px_30px] items-center gap-2 p-3 mx-2 my-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl shadow-lg`}>
+                          <div key={game.id} className="grid grid-cols-[45px_1fr_40px_30px] items-center gap-2 p-3 hover:bg-slate-800/30 transition-colors bg-gradient-to-r from-pink-900/40 to-orange-900/40 border-b border-slate-800">
                             <span className="font-mono text-orange-400 text-[10px] font-black">{game.match_time}</span>
-                            <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words">{game.event_description}</span>
-                            <div className="flex justify-center"><span className="bg-pink-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded">{game.court}</span></div>
+                            <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words px-2">{game.event_description}</span>
+                            <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded">{game.court}</span></div>
                             <button onClick={() => setGameToEdit({ ...game })} className="text-slate-300 hover:text-white p-2 text-right">✏️</button>
                           </div>
                         );
                       }
 
                       return (
-                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_25px_30px] items-center gap-1 p-3 hover:bg-slate-800/30 transition-colors ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
+                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px_30px] items-center gap-1 p-3 hover:bg-slate-800/30 transition-colors ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
                           <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
                           <span className="text-[10px] font-black uppercase text-slate-200 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
                           <span className="text-[8px] text-slate-600 italic font-black px-1">VS</span>
                           <span className="text-[10px] font-black uppercase text-slate-200 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
-                          <span className="text-orange-500 text-[10px] font-black text-center">{game.court}</span>
+                          <div className="flex justify-end pr-1"><span className="bg-orange-500 text-black font-black text-[10px] w-6 h-6 flex items-center justify-center rounded">{game.court}</span></div>
                           {game.id.toString().startsWith('d') ? (
                             <span className="w-8"></span> 
                           ) : (
@@ -899,7 +923,7 @@ export default function Home() {
               
               <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <input type="checkbox" id="isEventToggle" checked={newGame.is_event} onChange={(e) => setNewGame({...newGame, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
-                <label htmlFor="isEventToggle" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">Evento Speciale</label>
+                <label htmlFor="isEventToggle" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">EVENTO SPECIALE</label>
               </div>
 
               <div>
@@ -914,11 +938,11 @@ export default function Home() {
                 <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Nome Evento</label>
-                    <input type="text" placeholder="Es. GARA DA 3 PUNTI" value={newGame.event_description} onChange={(e) => setNewGame({...newGame, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase placeholder-slate-600" />
+                    <input type="text" placeholder="GARA DA 3 PUNTI" value={newGame.event_description} onChange={(e) => setNewGame({...newGame, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase placeholder-slate-600" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in minuti (slitta i successivi)</label>
-                    <input type="number" placeholder="Es. 30" value={newGame.event_duration} onChange={(e) => setNewGame({...newGame, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
+                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in min (slitta successivi)</label>
+                    <input type="number" placeholder="30" value={newGame.event_duration} onChange={(e) => setNewGame({...newGame, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
                   </div>
                 </div>
               ) : (
@@ -928,7 +952,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-[2fr_1fr] gap-4 mt-4">
                 <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
                   <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
@@ -959,7 +983,7 @@ export default function Home() {
               
               <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
                 <input type="checkbox" id="isEventToggleEdit" checked={gameToEdit.is_event} onChange={(e) => setGameToEdit({...gameToEdit, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
-                <label htmlFor="isEventToggleEdit" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">Evento Speciale</label>
+                <label htmlFor="isEventToggleEdit" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">EVENTO SPECIALE</label>
               </div>
 
               <div>
@@ -974,11 +998,11 @@ export default function Home() {
                 <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Nome Evento</label>
-                    <input type="text" placeholder="Es. GARA DA 3 PUNTI" value={gameToEdit.event_description || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase placeholder-slate-600" />
+                    <input type="text" placeholder="GARA DA 3 PUNTI" value={gameToEdit.event_description || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in minuti</label>
-                    <input type="number" placeholder="Es. 30" value={gameToEdit.event_duration || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
+                    <input type="number" placeholder="30" value={gameToEdit.event_duration || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
                   </div>
                 </div>
               ) : (
@@ -988,7 +1012,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-[2fr_1fr] gap-4 mt-4">
                 <div className="min-w-0">
                   <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
                   <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
