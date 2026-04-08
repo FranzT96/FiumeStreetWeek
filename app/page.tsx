@@ -405,7 +405,7 @@ export default function Home() {
               <h2 className="text-xl font-black text-pink-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic mb-4">
                 <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className={`grid gap-4 ${liveGames.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                 {liveGames.length === 0 ? (
                   <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
                 ) : liveGames.map(game => {
