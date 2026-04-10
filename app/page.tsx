@@ -429,7 +429,7 @@ export default function Home() {
     setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max}));
   };
 
-  // --- SHOP LOGIC ---
+  // --- SHOP LOGIC CON GESTIONE ERRORI IN-MODAL ---
   const submitBid = async () => {
     setBidError(null); 
 
@@ -469,7 +469,7 @@ export default function Home() {
       setBidForm({ name: '', contact: '', amount: '' });
       setBidError(null);
       showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata. Se sarai il vincitore verrai contattato a fine asta!");
-      fetchData(); 
+      fetchData(); // Aggiorna per l'admin
     }
   };
 
@@ -587,7 +587,8 @@ export default function Home() {
                   return (
                     <div key={item.id} className={`bg-slate-900 rounded-2xl overflow-hidden border-2 shadow-xl flex flex-col ${item.type === 'limited' ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(236,72,153,1)]' : 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]'}`}>
                       
-                      <div className="aspect-[4/5] bg-slate-800 relative group">
+                      {/* CONTENITORE IMMAGINI A 2:3 PER FITTARE LE FOTO 333x500 */}
+                      <div className="aspect-[2/3] bg-slate-800 relative group">
                         <img src={currentImage} alt={`${item.name} - Foto ${imgIdx + 1}`} className="w-full h-full object-cover transition-opacity duration-300" />
                         
                         {item.type === 'limited' && (
