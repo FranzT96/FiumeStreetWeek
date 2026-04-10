@@ -242,20 +242,22 @@ export default function Home() {
     setIsAuthLoading(false);
   };
 
+  const performLogout = async () => {
+    closeModal();
+    await supabase.auth.signOut();
+    setUser(null);
+    setIsAdminUnlocked(false);
+    setEmail(''); setPassword(''); setRegName('');
+    setActiveTab('home');
+  };
+
   const promptLogout = () => {
     setModal({
       isOpen: true,
       title: "Logout",
       message: "Sei sicuro di voler uscire dal tuo account?",
       type: 'confirm',
-      onConfirm: async () => {
-        closeModal();
-        await supabase.auth.signOut();
-        setUser(null);
-        setIsAdminUnlocked(false);
-        setEmail(''); setPassword(''); setRegName('');
-        setActiveTab('home');
-      }
+      onConfirm: performLogout
     });
   };
 
@@ -1001,9 +1003,6 @@ export default function Home() {
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
-                        <span className="text-sm">🚪</span> Logout
-                      </button>
                     </div>
                   </>
                 )}
@@ -1285,43 +1284,64 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Ridisegnato a griglia per hitbox perfette) --- */}
+      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[100]">
         <div className="grid grid-cols-6 max-w-md mx-auto px-1 pt-2 pb-4 sm:pb-6">
           
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-full transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('home'); }} 
+            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
+          >
             <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'home' ? 'scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'scale-100'}`}>🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
           </button>
           
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center w-full transition-all duration-200 ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('gironi'); }} 
+            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
+          >
             <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'gironi' ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'scale-100'}`}>📊</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Gironi</span>
           </button>
           
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center w-full transition-all duration-200 ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('calendario'); }} 
+            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
+          >
             <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'calendario' ? 'scale-110 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'scale-100'}`}>📅</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Orari</span>
           </button>
           
-          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center w-full transition-all duration-200 ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('playoff'); }} 
+            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
+          >
             <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'playoff' ? 'scale-110 drop-shadow-[0_0_8px_rgba(219,39,119,0.8)]' : 'scale-100'}`}>🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
           </button>
           
-          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center w-full transition-all duration-200 ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('shop'); }} 
+            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
+          >
             <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'shop' ? 'scale-110 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]' : 'scale-100'}`}>🛍️</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Shop</span>
           </button>
           
           {/* ICONA DINAMICA: ADMIN / LOGOUT */}
           {isAdminUnlocked ? (
-            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center w-full transition-all duration-200 ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+            <button 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('admin'); }} 
+              className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
+            >
               <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'admin' ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'scale-100'}`}>⚙️</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Admin</span>
             </button>
           ) : (
-            <button onClick={() => promptLogout()} className="flex flex-col items-center justify-center w-full text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95">
+            <button 
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptLogout(); }} 
+              className="flex flex-col items-center justify-center w-full text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer relative z-[200] touch-manipulation"
+            >
               <span className="text-xl sm:text-2xl scale-100 drop-shadow-none">🚪</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Esci</span>
             </button>
