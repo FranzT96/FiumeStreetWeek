@@ -47,7 +47,6 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
-  // Auth Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [regName, setRegName] = useState('');
@@ -149,7 +148,6 @@ export default function Home() {
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH (Semplificata, solo email e nome) ---
   const handleAuthAction = async () => {
     if (!email || !password) {
       showAlert("Dati mancanti", "Inserisci email e password.");
@@ -484,14 +482,12 @@ export default function Home() {
       return;
     }
 
-    // Prende i dati dell'utente dal login
     const userEmail = user?.email || '';
     const userName = user?.user_metadata?.full_name || extractNameFromEmail(userEmail);
     const newTimestamp = new Date().toISOString();
 
     setIsSubmittingBid(true);
 
-    // Usa l'email come chiave univoca per aggiornare (upserting) l'offerta se esiste già
     const { data: existingBids } = await supabase.from('bids')
       .select('id')
       .eq('item_id', selectedBidItem.id)
@@ -508,7 +504,7 @@ export default function Home() {
       const { error: insertError } = await supabase.from('bids').insert({
         item_id: selectedBidItem.id,
         bidder_name: userName,
-        contact_info: userEmail, // Manteniamo l'email nel DB per contattarli
+        contact_info: userEmail,
         amount: amountNum,
         created_at: newTimestamp
       });
@@ -907,6 +903,9 @@ export default function Home() {
                       <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
+                      <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
+                        <span className="text-sm">🚪</span> Logout Admin
+                      </button>
                     </div>
                   </>
                 )}
@@ -1188,7 +1187,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth Invariata) --- */}
+      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-between items-center max-w-xl mx-auto p-1 sm:p-2">
           <button onClick={() => setActiveTab('home')} className={`w-1/6 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
@@ -1347,7 +1346,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA --- */}
+      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata) --- */}
       {isBidModalOpen && selectedBidItem && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
