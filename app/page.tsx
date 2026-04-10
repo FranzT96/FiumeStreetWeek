@@ -39,19 +39,17 @@ export default function Home() {
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
   const [currentImageIndexes, setCurrentImageIndexes] = useState<Record<number | string, number>>({});
 
-  // --- STATI PER AUTH E MENU ADMIN ---
+  // --- STATI PER AUTH (AGGIORNATI PER OTP) ---
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
-  
-  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
-  const isRecoveryRef = useRef(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset_request' | 'reset_verify'>('login');
   
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [regName, setRegName] = useState('');
+  const [otpCode, setOtpCode] = useState(''); // Stato per il codice a 6 cifre
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
 
@@ -119,39 +117,17 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // Intercetta l'URL in modo silenzioso per capire se siamo in fase di reset
-    if (typeof window !== 'undefined') {
-      const urlStr = window.location.href;
-      if (urlStr.includes('type=recovery') || urlStr.includes('code=')) {
-        isRecoveryRef.current = true;
-        setIsRecoveringPassword(true);
-        setAuthChecking(false);
-      }
-    }
-
     checkSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        isRecoveryRef.current = true;
-        setIsRecoveringPassword(true);
-        setAuthChecking(false);
-      } else if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN') {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
-        
-        if (!isRecoveryRef.current) {
-          setIsRecoveringPassword(false);
-          fetchData();
-          setActiveTab('home');
-        } else {
-          setAuthChecking(false);
-        }
+        fetchData();
+        setActiveTab('home');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAdminUnlocked(false);
-        setIsRecoveringPassword(false);
-        isRecoveryRef.current = false;
       }
     });
 
@@ -166,67 +142,75 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (user && !isRecoveringPassword) fetchData();
-  }, [user, isRecoveringPassword]);
+    if (user) fetchData();
+  }, [user]);
 
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AGGIORNAMENTO PASSWORD (CON CATTURA ERRORE PKCE) ---
-  const handleUpdatePassword = async () => {
-    if (!password) {
-      showAlert("Attenzione", "Inserisci la nuova password.");
-      return;
-    }
-    
-    setIsAuthLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setIsAuthLoading(false);
-
-    if (error) {
-      // Se l'errore è dovuto alla sessione mancante (problema del browser diverso)
-      if (error.message.includes('session') || error.message.includes('Auth session missing')) {
-        showAlert("Errore di Sicurezza 🔒", "Stai cercando di salvare la password su un browser o dispositivo diverso da quello che hai usato per richiederla (oppure l'hai aperta da Gmail/Outlook). Per sicurezza, il sistema ti ha bloccato. Devi richiedere un nuovo link e aprirlo ESATTAMENTE sullo stesso browser!");
-      } else {
-        showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
-      }
-    } else {
-      isRecoveryRef.current = false;
-      setIsRecoveringPassword(false);
-      setPassword('');
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato.");
-      fetchData();
-      setActiveTab('home');
-    }
-  };
-
+  // --- LOGICA AUTH CON SISTEMA OTP ---
   const handleAuthAction = async () => {
     setIsAuthLoading(true);
 
-    if (authMode === 'reset') {
+    // FASE 1: Richiesta del codice OTP via email
+    if (authMode === 'reset_request') {
       if (!email) {
         showAlert("Dati mancanti", "Inserisci la tua email per recuperare la password.");
         setIsAuthLoading(false);
         return;
       }
       
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
 
       if (error) {
-        showAlert("Errore", "Impossibile inviare il link. Controlla l'email.");
+        showAlert("Errore", "Impossibile inviare il codice. Controlla l'email.");
       } else {
-        showAlert("Controlla la Mail", "Ti abbiamo inviato un link sicuro per reimpostare la tua password.");
-        setAuthMode('login');
+        setAuthMode('reset_verify'); // Passiamo alla fase di verifica codice
+        showAlert("Codice Inviato!", "Controlla la tua casella di posta per il codice a 6 cifre.");
       }
       setIsAuthLoading(false);
       return;
     }
 
+    // FASE 2: Verifica codice OTP e salvataggio nuova password
+    if (authMode === 'reset_verify') {
+      if (!otpCode || !password) {
+        showAlert("Dati mancanti", "Inserisci il codice ricevuto e la nuova password.");
+        setIsAuthLoading(false);
+        return;
+      }
+
+      // Verifichiamo l'OTP
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode,
+        type: 'recovery'
+      });
+
+      if (verifyError) {
+        setIsAuthLoading(false);
+        showAlert("Errore Codice", "Il codice inserito non è valido o è scaduto.");
+        return;
+      }
+
+      // Se il codice è corretto, Supabase ha creato una sessione temporanea. Cambiamo la password:
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      
+      setIsAuthLoading(false);
+
+      if (updateError) {
+        showAlert("Errore", "Impossibile aggiornare la password: " + updateError.message);
+      } else {
+        setOtpCode('');
+        setPassword('');
+        showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato e pronto.");
+        fetchData();
+        setActiveTab('home');
+      }
+      return;
+    }
+
+    // FASE LOGIN / REGISTRAZIONE
     if (!email || !password) {
       showAlert("Dati mancanti", "Inserisci email e password.");
       setIsAuthLoading(false);
@@ -240,7 +224,7 @@ export default function Home() {
       } else {
         setEmail(''); setPassword('');
       }
-    } else {
+    } else if (authMode === 'register') {
       if (!regName) {
         showAlert("Dati mancanti", "Inserisci il tuo Nome e Cognome per registrarti.");
         setIsAuthLoading(false);
@@ -250,11 +234,7 @@ export default function Home() {
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
-        options: {
-          data: {
-            full_name: regName
-          }
-        }
+        options: { data: { full_name: regName } }
       });
 
       if (error) {
@@ -277,7 +257,7 @@ export default function Home() {
     await supabase.auth.signOut();
     setUser(null);
     setIsAdminUnlocked(false);
-    setEmail(''); setPassword(''); setRegName('');
+    setEmail(''); setPassword(''); setRegName(''); setOtpCode('');
     setActiveTab('home');
   };
 
@@ -606,44 +586,7 @@ export default function Home() {
 
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
-  // --- SCHERMATA AGGIORNAMENTO PASSWORD (via link email) ---
-  if (isRecoveringPassword) {
-    return (
-      <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
-        <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] animate-fade-in relative overflow-hidden">
-          <h3 className="text-2xl font-black uppercase mb-2 text-center text-white italic tracking-widest">Nuova Password</h3>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center mb-6">Inserisci la tua nuova password per l'account.</p>
-          
-          <input 
-            type="password" 
-            placeholder="Nuova Password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors mb-6" 
-          />
-          
-          <button 
-            onClick={handleUpdatePassword} 
-            disabled={isAuthLoading} 
-            className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}
-          >
-            {isAuthLoading ? 'Salvataggio...' : 'Salva e Accedi'}
-          </button>
-        </div>
-        {modal.isOpen && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-              <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
-              <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-              <div className="flex justify-end gap-3"><button onClick={closeModal} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Ok</button></div>
-            </div>
-          </div>
-        )}
-      </main>
-    );
-  }
-
-  // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET ---
+  // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET (TUTTO TRAMITE APP) ---
   if (!user) {
     return (
       <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
@@ -653,30 +596,49 @@ export default function Home() {
             <img src="/icon.png" alt="FSW Logo" className="w-40 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] object-contain" />
           </div>
           
-          {authMode !== 'reset' && (
+          {/* TAB SUPERIORI (Nascondi se stiamo in reset) */}
+          {(authMode === 'login' || authMode === 'register') && (
             <div className="flex gap-2 mb-6">
               <button onClick={() => { setAuthMode('login'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Accedi</button>
               <button onClick={() => { setAuthMode('register'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'register' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Registrati</button>
             </div>
           )}
 
-          {authMode === 'reset' && (
+          {/* INTESTAZIONI RESET */}
+          {authMode === 'reset_request' && (
             <div className="mb-6 text-center">
               <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2">Recupera Password</h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Inserisci la tua email per ricevere il link magico.</p>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Inserisci la tua email per ricevere il codice segreto.</p>
+            </div>
+          )}
+          {authMode === 'reset_verify' && (
+            <div className="mb-6 text-center">
+              <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2">Inserisci Codice</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Abbiamo inviato un codice a 6 cifre alla tua email.</p>
             </div>
           )}
 
+          {/* CAMPI INPUT */}
           <div className="space-y-4 mb-6">
-            <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             
-            {authMode !== 'reset' && (
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+            {/* Campo Email usato in Login, Register e Reset_Request */}
+            {authMode !== 'reset_verify' && (
+              <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+            )}
+            
+            {/* Input OTP a 6 cifre */}
+            {authMode === 'reset_verify' && (
+              <input type="text" placeholder="Codice a 6 cifre" maxLength={6} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-center text-2xl tracking-[0.5em] outline-none focus:border-cyan-500 font-mono transition-colors uppercase" />
+            )}
+
+            {/* Campo Password: Usato nel login, register e nel reset_verify (per la nuova) */}
+            {(authMode === 'login' || authMode === 'register' || authMode === 'reset_verify') && (
+              <input type="password" placeholder={authMode === 'reset_verify' ? "Scrivi Nuova Password" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             )}
             
             {authMode === 'login' && (
               <div className="text-right">
-                <button onClick={() => setAuthMode('reset')} className="text-slate-500 hover:text-cyan-400 text-[10px] font-black uppercase tracking-widest transition-colors">Password dimenticata?</button>
+                <button onClick={() => setAuthMode('reset_request')} className="text-slate-500 hover:text-cyan-400 text-[10px] font-black uppercase tracking-widest transition-colors">Password dimenticata?</button>
               </div>
             )}
 
@@ -691,12 +653,19 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-3">
-            <button onClick={handleAuthAction} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : authMode === 'register' ? 'bg-pink-500 text-white active:scale-95' : 'bg-orange-500 text-slate-900 active:scale-95'}`}>
-              {isAuthLoading ? 'Caricamento...' : authMode === 'login' ? 'Entra nel Torneo' : authMode === 'register' ? 'Crea Account' : 'Invia Link di Recupero'}
+            <button 
+              onClick={handleAuthAction} 
+              disabled={isAuthLoading} 
+              className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' || authMode === 'reset_verify' ? 'bg-cyan-500 text-slate-900 active:scale-95' : authMode === 'register' ? 'bg-pink-500 text-white active:scale-95' : 'bg-orange-500 text-slate-900 active:scale-95'}`}
+            >
+              {isAuthLoading ? 'Caricamento...' : 
+               authMode === 'login' ? 'Entra nel Torneo' : 
+               authMode === 'register' ? 'Crea Account' : 
+               authMode === 'reset_request' ? 'Invia Codice' : 'Aggiorna e Accedi'}
             </button>
             
-            {authMode === 'reset' && (
-              <button onClick={() => setAuthMode('login')} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full hover:text-white transition-colors">Torna al Login</button>
+            {(authMode === 'reset_request' || authMode === 'reset_verify') && (
+              <button onClick={() => { setAuthMode('login'); setOtpCode(''); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full hover:text-white transition-colors">Torna al Login</button>
             )}
           </div>
         </div>
@@ -1044,9 +1013,6 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
-                        <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
                   </>
