@@ -5,10 +5,11 @@ import { createClient } from '@/utils/supabase';
 
 export default function Home() {
   // --- CONFIGURAZIONE ADMIN ---
-  const ADMIN_EMAIL = 'fiumestreetweek@gmail.com';
+  const ADMIN_EMAIL = 'admin@fsw.it';
 
   const [loading, setLoading] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(false); // <-- NUOVO STATO PER FIXARE IL BOTTONE
   
   const [teams, setTeams] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
@@ -46,7 +47,7 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
-  // Auth Form Fields (Semplificato)
+  // Auth Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -99,12 +100,11 @@ export default function Home() {
     
     const { data: shopData, error: shopError } = await supabase.from('shop_items').select('*');
     
-    // Fetch bids solo per l'Admin, ordinati per prezzo (DESC) e per orario (ASC)
     const { data: { session } } = await supabase.auth.getSession();
     if (session && session.user.email === ADMIN_EMAIL) {
       const { data: bidsData } = await supabase.from('bids').select('*')
         .order('amount', { ascending: false })
-        .order('created_at', { ascending: true }); // A parità di cifra, il primo vince
+        .order('created_at', { ascending: true }); 
       if (bidsData) setBids(bidsData);
     }
 
@@ -141,7 +141,6 @@ export default function Home() {
     };
   }, []);
 
-  // Se siamo loggati, carichiamo i dati
   useEffect(() => {
     if (user) fetchData();
   }, [user]);
@@ -149,14 +148,14 @@ export default function Home() {
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH (Semplificata, solo email e pass) ---
+  // --- LOGICA AUTH (Fixata per usare isAuthLoading) ---
   const handleAuthAction = async () => {
     if (!email || !password) {
       showAlert("Dati mancanti", "Inserisci email e password.");
       return;
     }
     
-    setLoading(true);
+    setIsAuthLoading(true); // <-- Usa il nuovo stato!
     
     if (authMode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -165,7 +164,7 @@ export default function Home() {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) showAlert("Errore", error.message);
     }
-    setLoading(false);
+    setIsAuthLoading(false); // <-- Sblocca il pulsante
   };
 
   const promptLogout = () => {
@@ -182,7 +181,6 @@ export default function Home() {
     });
   };
 
-  // --- LOGICA TORNEO ---
   const resetTournament = () => {
     setModal({ isOpen: true, title: "⚠️ ATTENZIONE", message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.", type: 'confirm', onConfirm: async () => { closeModal(); setLoading(true); await supabase.from('games').delete().neq('stage', 'girone'); await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); await fetchData(); } });
   };
@@ -430,11 +428,9 @@ export default function Home() {
     setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
-  // --- FUNZIONI CAROSELLO IMMAGINI ---
   const nextImage = (e: React.MouseEvent, itemId: string | number, max: number) => { e.stopPropagation(); setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) + 1) % max})); };
   const prevImage = (e: React.MouseEvent, itemId: string | number, max: number) => { e.stopPropagation(); setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max})); };
 
-  // --- SHOP LOGIC (Offerte Anti-Troll e Upserting) ---
   const submitBid = async () => {
     setBidError(null); 
 
@@ -455,14 +451,13 @@ export default function Home() {
       return;
     }
 
-    setIsSubmittingBid(true);
-    
     const userEmail = user?.email || '';
     const userName = extractNameFromEmail(userEmail);
     const newTimestamp = new Date().toISOString();
 
-    // Controlliamo se esiste già un'offerta per questa canotta da questo utente
-    const { data: existingBids, error: fetchError } = await supabase.from('bids')
+    setIsSubmittingBid(true);
+
+    const { data: existingBids } = await supabase.from('bids')
       .select('id')
       .eq('item_id', selectedBidItem.id)
       .eq('contact_info', userEmail);
@@ -470,13 +465,11 @@ export default function Home() {
     let error = null;
 
     if (existingBids && existingBids.length > 0) {
-      // Upsert: aggiorna il prezzo e il timestamp
       const { error: updateError } = await supabase.from('bids')
         .update({ amount: amountNum, bidder_name: userName, created_at: newTimestamp })
         .eq('id', existingBids[0].id);
       error = updateError;
     } else {
-      // Inserimento nuova offerta
       const { error: insertError } = await supabase.from('bids').insert({
         item_id: selectedBidItem.id,
         bidder_name: userName,
@@ -501,10 +494,10 @@ export default function Home() {
     }
   };
 
-  // Se l'auth è ancora in fase di caricamento, mostriamo spinner
+  // Se l'auth è in fase di caricamento
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
-  // Se non c'è l'utente, forziamo la schermata di login esclusiva
+  // Schermata Muro per il Login
   if (!user) {
     return (
       <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
@@ -514,9 +507,6 @@ export default function Home() {
             <img src="/icon.png" alt="FSW Logo" className="w-40 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] object-contain" />
           </div>
           
-          <h1 className="text-2xl font-black uppercase mb-2 text-center text-white italic tracking-widest">Accesso FSW</h1>
-          <p className="text-slate-400 text-xs font-bold text-center uppercase tracking-widest mb-8">Accedi per consultare risultati, tabellone e fare offerte nello store.</p>
-          
           <div className="flex gap-2 mb-6">
             <button onClick={() => { setAuthMode('login'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Accedi</button>
             <button onClick={() => { setAuthMode('register'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'register' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Registrati</button>
@@ -525,17 +515,16 @@ export default function Home() {
           <div className="space-y-4 mb-8">
             <div>
               <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
-              {authMode === 'register' && <p className="text-[9px] text-slate-500 mt-1 italic pl-1">Servirà per contattarti in caso di vittoria all'asta.</p>}
             </div>
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
           </div>
 
-          <button onClick={handleAuthAction} disabled={loading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${loading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : 'bg-pink-500 text-white active:scale-95'}`}>
-            {loading ? 'Caricamento...' : authMode === 'login' ? 'Entra nel Torneo' : 'Crea Account'}
+          <button onClick={handleAuthAction} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : 'bg-pink-500 text-white active:scale-95'}`}>
+            {isAuthLoading ? 'Caricamento...' : authMode === 'login' ? 'Entra nel Torneo' : 'Crea Account'}
           </button>
         </div>
 
-        {/* MODALE ALERTS PER IL LOGIN */}
+        {/* MODALE ALERTS PER LA SCHERMATA LOGIN */}
         {modal.isOpen && (
           <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
@@ -549,7 +538,7 @@ export default function Home() {
     );
   }
 
-  // App Principale (solo se loggati)
+  // App Principale Loggata
   if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione Dati...</div>;
 
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
@@ -565,7 +554,6 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO: VISIBILE SOLO NELLA HOME */}
         {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
@@ -1159,7 +1147,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (6 Icone con Logica Auth Invariata) --- */}
+      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-between items-center max-w-xl mx-auto p-1 sm:p-2">
           <button onClick={() => setActiveTab('home')} className={`w-1/6 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
@@ -1313,49 +1301,6 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
               <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata) --- */}
-      {isBidModalOpen && selectedBidItem && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
-            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
-            
-            {bidError && (
-              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
-                {bidError}
-              </div>
-            )}
-
-            <div className="space-y-4 mb-8">
-              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
-                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Stai offrendo come:</p>
-                <p className="text-sm text-slate-300 font-black uppercase">{extractNameFromEmail(user?.email)}</p>
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user?.email}</p>
-              </div>
-
-              <div>
-                <label className="text-[9px] font-black uppercase text-pink-500 tracking-widest block mb-1">La tua offerta (€)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
-                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-pink-900 text-xl outline-none focus:border-pink-500 font-black transition-colors" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={submitBid} 
-                disabled={isSubmittingBid}
-                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
-              >
-                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
-              </button>
-              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
             </div>
           </div>
         </div>
