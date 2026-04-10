@@ -162,10 +162,8 @@ export default function Home() {
         showAlert("Errore Login", "Credenziali non valide. Controlla e riprova."); 
       } else {
         setEmail(''); setPassword('');
-        // Il listener onAuthStateChange gestirà il redirect
       }
     } else {
-      // Registrazione
       if (!regName) {
         showAlert("Dati mancanti", "Inserisci il tuo Nome e Cognome per registrarti.");
         setIsAuthLoading(false);
@@ -187,7 +185,6 @@ export default function Home() {
       } else {
         setEmail(''); setPassword(''); setRegName('');
         
-        // Controllo se Supabase ha bloccato il login automatico a causa delle conferme email
         if (data.user && !data.session) {
           showAlert("ATTENZIONE", "Devi disattivare 'Confirm email' su Supabase > Authentication > Providers > Email per permettere l'accesso diretto. Altrimenti dovrai cliccare il link mandato via mail.");
         } else {
@@ -504,7 +501,7 @@ export default function Home() {
       const { error: insertError } = await supabase.from('bids').insert({
         item_id: selectedBidItem.id,
         bidder_name: userName,
-        contact_info: userEmail,
+        contact_info: userEmail, 
         amount: amountNum,
         created_at: newTimestamp
       });
@@ -520,7 +517,7 @@ export default function Home() {
       setIsBidModalOpen(false);
       setBidForm({ amount: '' });
       setBidError(null);
-      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata.");
+      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata. Se sarai il vincitore verrai contattato a fine asta!");
       fetchData(); 
     }
   };
@@ -547,7 +544,6 @@ export default function Home() {
             <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             
-            {/* Campi Extra solo se Registrazione */}
             {authMode === 'register' && (
               <div className="space-y-4 pt-4 border-t border-slate-800 mt-4">
                 <div>
@@ -591,7 +587,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
+    <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-28 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {activeTab === 'home' && (
@@ -723,7 +719,7 @@ export default function Home() {
                         </div>
                         
                         {item.type === 'limited' ? (
-                          <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">Fai un'offerta 🤫</button>
+                          <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto active:scale-95">Fai un'offerta 🤫</button>
                         ) : (
                           <button onClick={() => showAlert("Corri al Bar! 🍻", "Le canotte ufficiali FSW ti aspettano al bar dell'evento! Vai a sceglierla, provala e falla tua prima che finiscano le taglie.")} className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg active:scale-95 mt-auto">Acquista al bar</button>
                         )}
@@ -844,7 +840,7 @@ export default function Home() {
                   
                   return (
                     <div key={stage} className="min-w-[85vw] sm:min-w-[320px] snap-center flex flex-col gap-4 relative">
-                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase tracking-widest text-sm shadow-md">
+                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase text-sm shadow-md">
                         {stage === 'finali' ? 'FINALI' : stage}
                       </div>
                       
@@ -902,9 +898,6 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
                         <span className="text-sm">🗑️</span> Azzera Torneo
-                      </button>
-                      <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
-                        <span className="text-sm">🚪</span> Logout Admin
                       </button>
                     </div>
                   </>
@@ -1187,40 +1180,43 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
-      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
-        <div className="flex justify-between items-center max-w-xl mx-auto p-1 sm:p-2">
-          <button onClick={() => setActiveTab('home')} className={`w-1/6 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
-            <span className="text-lg sm:text-xl mb-1">🔥</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Live</span>
-          </button>
-          <button onClick={() => setActiveTab('gironi')} className={`w-1/6 flex flex-col items-center ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}>
-            <span className="text-lg sm:text-xl mb-1">📊</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Gironi</span>
-          </button>
-          <button onClick={() => setActiveTab('calendario')} className={`w-1/6 flex flex-col items-center ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}>
-            <span className="text-lg sm:text-xl mb-1">📅</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Orari</span>
-          </button>
-          <button onClick={() => setActiveTab('playoff')} className={`w-1/6 flex flex-col items-center ${activeTab === 'playoff' ? 'text-pink-600' : 'text-slate-500'}`}>
-            <span className="text-lg sm:text-xl mb-1">🏆</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Playoff</span>
-          </button>
-          <button onClick={() => setActiveTab('shop')} className={`w-1/6 flex flex-col items-center ${activeTab === 'shop' ? 'text-purple-400' : 'text-slate-500'}`}>
-            <span className="text-lg sm:text-xl mb-1">🛍️</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Shop</span>
+      {/* --- MENU BASSO DINAMICO (Ridisegnato per evitare tagli) --- */}
+      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
+        <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+            <span className={`text-xl transition-all duration-200 ${activeTab === 'home' ? 'scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'scale-100'}`}>🔥</span>
+            <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Live</span>
           </button>
           
-          {/* ICONA DINAMICA: ADMIN / LOGOUT */}
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+            <span className={`text-xl transition-all duration-200 ${activeTab === 'gironi' ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'scale-100'}`}>📊</span>
+            <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Gironi</span>
+          </button>
+          
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+            <span className={`text-xl transition-all duration-200 ${activeTab === 'calendario' ? 'scale-110 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'scale-100'}`}>📅</span>
+            <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Orari</span>
+          </button>
+          
+          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+            <span className={`text-xl transition-all duration-200 ${activeTab === 'playoff' ? 'scale-110 drop-shadow-[0_0_8px_rgba(219,39,119,0.8)]' : 'scale-100'}`}>🏆</span>
+            <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Playoff</span>
+          </button>
+          
+          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+            <span className={`text-xl transition-all duration-200 ${activeTab === 'shop' ? 'scale-110 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]' : 'scale-100'}`}>🛍️</span>
+            <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Shop</span>
+          </button>
+          
           {isAdminUnlocked ? (
-            <button onClick={() => setActiveTab('admin')} className={`w-1/6 flex flex-col items-center animate-fade-in ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}>
-              <span className="text-lg sm:text-xl mb-1">⚙️</span>
-              <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center text-white">Admin</span>
+            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+              <span className={`text-xl transition-all duration-200 ${activeTab === 'admin' ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'scale-100'}`}>⚙️</span>
+              <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Admin</span>
             </button>
           ) : (
-            <button onClick={promptLogout} className="w-1/6 flex flex-col items-center text-red-500 hover:text-red-400 transition-colors">
-              <span className="text-lg sm:text-xl mb-1">🚪</span>
-              <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Esci</span>
+            <button onClick={promptLogout} className="flex flex-col items-center justify-center w-[16%] text-red-500 hover:text-red-400 transition-all duration-200 active:scale-95">
+              <span className="text-xl scale-100">🚪</span>
+              <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Esci</span>
             </button>
           )}
         </div>
@@ -1346,7 +1342,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata) --- */}
+      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA --- */}
       {isBidModalOpen && selectedBidItem && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
@@ -1385,17 +1381,6 @@ export default function Home() {
               </button>
               <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE ALERTS (Per l'app principale) --- */}
-      {modal.isOpen && (
-        <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button></div>
           </div>
         </div>
       )}
