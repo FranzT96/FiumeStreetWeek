@@ -44,7 +44,6 @@ export default function Home() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
   
-  // Memoria di ferro per la gestione del recupero password (risolve i crash di sessione)
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   const isRecoveryRef = useRef(false);
   
@@ -120,53 +119,35 @@ export default function Home() {
   };
 
   useEffect(() => {
-    checkSession();
-    
-    let recoveryTimeout: NodeJS.Timeout;
-
-    // GESTIONE INTELLIGENTE DEL RECUPERO PASSWORD
+    // Intercetta l'URL in modo silenzioso per capire se siamo in fase di reset
     if (typeof window !== 'undefined') {
       const urlStr = window.location.href;
-      
-      // Rileviamo se l'utente arriva da un link di reset
-      if (urlStr.includes('code=') || urlStr.includes('type=recovery')) {
-        
-        // Impostiamo un timer "cane da guardia". 
-        // Se Supabase non lancia l'evento di successo entro 2.5 secondi, significa che il browser in-app (Outlook/IG) ha rotto la connessione di sicurezza.
-        recoveryTimeout = setTimeout(() => {
-          if (!isRecoveryRef.current) {
-            showAlert("⚠️ Browser Incompatibile", "Stai aprendo l'app da un browser interno (es. Outlook o Gmail) che blocca il ripristino per sicurezza. Tieni premuto il link nella mail, fai 'Copia' e incollalo direttamente su Safari o Chrome.");
-            setAuthChecking(false);
-          }
-        }, 2500);
-      }
-    }
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      
-      if (event === 'PASSWORD_RECOVERY') {
-        // Supabase ha processato il token con successo!
-        clearTimeout(recoveryTimeout); // Spegniamo il cane da guardia
+      if (urlStr.includes('type=recovery') || urlStr.includes('code=')) {
         isRecoveryRef.current = true;
         setIsRecoveringPassword(true);
         setAuthChecking(false);
-      } 
-      else if (event === 'SIGNED_IN') {
+      }
+    }
+
+    checkSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryRef.current = true;
+        setIsRecoveringPassword(true);
+        setAuthChecking(false);
+      } else if (event === 'SIGNED_IN') {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
         
-        if (isRecoveryRef.current) {
-          // Mantieni aperta la modale di reset
-          setIsRecoveringPassword(true);
-          setAuthChecking(false);
-        } else {
-          // Accesso normale
+        if (!isRecoveryRef.current) {
           setIsRecoveringPassword(false);
           fetchData();
           setActiveTab('home');
+        } else {
+          setAuthChecking(false);
         }
-      } 
-      else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAdminUnlocked(false);
         setIsRecoveringPassword(false);
@@ -179,7 +160,6 @@ export default function Home() {
     const channelPlayers = supabase.channel('realtime-players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => { fetchData(); }).subscribe();
     
     return () => { 
-      if (recoveryTimeout) clearTimeout(recoveryTimeout);
       supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); 
       authListener.subscription.unsubscribe();
     };
@@ -192,7 +172,7 @@ export default function Home() {
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AGGIORNAMENTO PASSWORD DA LINK ---
+  // --- LOGICA AGGIORNAMENTO PASSWORD (CON CATTURA ERRORE PKCE) ---
   const handleUpdatePassword = async () => {
     if (!password) {
       showAlert("Attenzione", "Inserisci la nuova password.");
@@ -200,25 +180,24 @@ export default function Home() {
     }
     
     setIsAuthLoading(true);
-    
-    // Essendo entrati tramite PASSWORD_RECOVERY, la sessione è autenticata in background
     const { error } = await supabase.auth.updateUser({ password });
     setIsAuthLoading(false);
 
     if (error) {
-      showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
+      // Se l'errore è dovuto alla sessione mancante (problema del browser diverso)
+      if (error.message.includes('session') || error.message.includes('Auth session missing')) {
+        showAlert("Errore di Sicurezza 🔒", "Stai cercando di salvare la password su un browser o dispositivo diverso da quello che hai usato per richiederla (oppure l'hai aperta da Gmail/Outlook). Per sicurezza, il sistema ti ha bloccato. Devi richiedere un nuovo link e aprirlo ESATTAMENTE sullo stesso browser!");
+      } else {
+        showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
+      }
     } else {
-      // Pulizia totale
       isRecoveryRef.current = false;
       setIsRecoveringPassword(false);
       setPassword('');
-      
-      // Puliamo l'URL dai residui di token per evitare loop strani ai successivi reload
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-      
-      showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato e pronto.");
+      showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato.");
       fetchData();
       setActiveTab('home');
     }
