@@ -1512,6 +1512,22 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* --- MODALE ALERTS PRINCIPALE (z-index assoluto) --- */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
+            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+            <div className="flex justify-end gap-3">
+              {modal.type === 'confirm' && (
+                <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
+              )}
+              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Conferma</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
