@@ -44,7 +44,7 @@ export default function Home() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
   
-  // Memoria di ferro per il recupero password
+  // FIX: Memoria di ferro per il recupero password
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   const isRecoveryRef = useRef(false);
   
@@ -121,10 +121,14 @@ export default function Home() {
 
   useEffect(() => {
     // 1. Controllo Immediato dell'URL (prima che Supabase lo pulisca)
-    if (typeof window !== 'undefined' && window.location.href.includes('type=recovery')) {
-      isRecoveryRef.current = true;
-      setIsRecoveringPassword(true);
-      setAuthChecking(false);
+    // Catturiamo sia il vecchio "type=recovery" che il nostro nuovo custom "action=reset_password"
+    if (typeof window !== 'undefined') {
+      const currentUrl = window.location.href;
+      if (currentUrl.includes('type=recovery') || currentUrl.includes('action=reset_password')) {
+        isRecoveryRef.current = true;
+        setIsRecoveringPassword(true);
+        setAuthChecking(false);
+      }
     }
 
     checkSession();
@@ -139,11 +143,14 @@ export default function Home() {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
         
+        // Se NON stiamo facendo un recupero, navighiamo normalmente nell'app
         if (!isRecoveryRef.current) {
           setIsRecoveringPassword(false);
           fetchData();
           setActiveTab('home');
         } else {
+          // Se siamo in recupero, sblocca il caricamento ma forzalo a restare sulla modale password
+          setIsRecoveringPassword(true);
           setAuthChecking(false);
         }
       } else if (event === 'SIGNED_OUT') {
@@ -171,6 +178,7 @@ export default function Home() {
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
+  // --- LOGICA AGGIORNAMENTO PASSWORD DA LINK ---
   const handleUpdatePassword = async () => {
     if (!password) {
       showAlert("Attenzione", "Inserisci la nuova password.");
@@ -187,7 +195,12 @@ export default function Home() {
       isRecoveryRef.current = false;
       setIsRecoveringPassword(false);
       setPassword('');
-      window.location.hash = ""; // Pulizia profonda
+      
+      // Pulizia profonda dell'URL per non ricascare nel reset al prossimo refresh
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      
       showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato.");
       fetchData();
       setActiveTab('home');
@@ -204,8 +217,11 @@ export default function Home() {
         return;
       }
       
+      // IL TRUCCO: Aggiungiamo "?action=reset_password" all'URL in modo da intercettarlo sempre
+      const resetUrl = `${window.location.origin}?action=reset_password`;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: resetUrl,
       });
 
       if (error) {
@@ -1036,9 +1052,6 @@ export default function Home() {
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
-                        <span className="text-sm">🚪</span> Logout
-                      </button>
                     </div>
                   </>
                 )}
@@ -1323,33 +1336,33 @@ export default function Home() {
       {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 6) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[200]">
         <div className="grid grid-cols-6 max-w-md mx-auto px-1 pt-2 pb-6">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
           </button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">📊</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Gironi</span>
           </button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">📅</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Orari</span>
           </button>
-          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
           </button>
-          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">🛍️</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Shop</span>
           </button>
           {isAdminUnlocked ? (
-            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400'}`}>
+            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
               <span className="text-xl sm:text-2xl">⚙️</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Admin</span>
             </button>
           ) : (
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptLogout(); }} className="flex flex-col items-center justify-center text-slate-400 active:text-white touch-manipulation relative z-[210]">
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptLogout(); }} className="flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 touch-manipulation relative z-[210]">
               <span className="text-xl sm:text-2xl">🚪</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Esci</span>
             </button>
@@ -1357,7 +1370,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- MODALE ALERTS / CONFERME (Z-INDEX 300) --- */}
+      {/* --- MODALE ALERTS E CONFERME --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
