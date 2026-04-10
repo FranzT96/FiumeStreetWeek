@@ -144,8 +144,7 @@ export default function Home() {
     if (user) fetchData();
   }, [user]);
 
-  // Fix modale: usiamo functional update per evitare i conflitti di stato (stale closures)
-  const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
+  const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
   const handleAuthAction = async () => {
@@ -217,23 +216,20 @@ export default function Home() {
     setIsAuthLoading(false);
   };
 
-  // Funzione sicura per il logout che non si incastra con gli stati precedenti
-  const performLogout = async () => {
-    closeModal();
-    await supabase.auth.signOut();
-    setUser(null);
-    setIsAdminUnlocked(false);
-    setEmail(''); setPassword(''); setRegName('');
-    setActiveTab('home');
-  };
-
   const promptLogout = () => {
     setModal({
       isOpen: true,
       title: "Logout",
       message: "Sei sicuro di voler uscire dal tuo account?",
       type: 'confirm',
-      onConfirm: performLogout
+      onConfirm: async () => {
+        closeModal();
+        await supabase.auth.signOut();
+        setUser(null);
+        setIsAdminUnlocked(false);
+        setEmail(''); setPassword(''); setRegName('');
+        setActiveTab('home');
+      }
     });
   };
 
@@ -890,7 +886,7 @@ export default function Home() {
                   
                   return (
                     <div key={stage} className="min-w-[85vw] sm:min-w-[320px] snap-center flex flex-col gap-4 relative">
-                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase text-sm shadow-md">
+                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase tracking-widest text-sm shadow-md">
                         {stage === 'finali' ? 'FINALI' : stage}
                       </div>
                       
@@ -933,24 +929,23 @@ export default function Home() {
         {activeTab === 'admin' && isAdminUnlocked && (
           <section className="animate-fade-in space-y-6">
             
-            <div className="flex justify-between items-center border-b-2 border-orange-500 pb-2 pt-4 relative">
+            <div className="flex justify-between items-center border-b-2 border-orange-500 pb-2 pt-4 relative z-[100]">
               <h2 className="text-2xl font-black text-orange-500 uppercase italic m-0 leading-none">Control Panel</h2>
               <div className="relative">
                 <button 
                   onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)} 
-                  className="bg-slate-800 text-slate-400 border border-slate-700 w-9 h-9 rounded-lg hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center shadow-lg text-lg pb-1"
+                  className="bg-slate-800 text-slate-400 border border-slate-700 w-9 h-9 rounded-lg hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center shadow-lg text-lg pb-1 relative z-20"
                 >
                   ⋮
                 </button>
                 {isAdminMenuOpen && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setIsAdminMenuOpen(false)}></div>
+                    <div className="fixed inset-0 cursor-default" onClick={() => setIsAdminMenuOpen(false)}></div>
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
-                      <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
+                      <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
-                      {/* FIX MENU LOGOUT ADMIN */}
-                      <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
+                      <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
@@ -959,7 +954,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800 overflow-x-auto hide-scrollbar">
+            <div className="flex gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800 overflow-x-auto hide-scrollbar relative z-10">
               <button onClick={() => setActiveAdminSubTab('live')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
               <button onClick={() => setActiveAdminSubTab('orari')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
@@ -1234,7 +1229,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
+      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
         <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -1262,6 +1257,7 @@ export default function Home() {
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Shop</span>
           </button>
           
+          {/* ICONA DINAMICA: ADMIN / LOGOUT */}
           {isAdminUnlocked ? (
             <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
               <span className={`text-xl transition-all duration-200 ${activeTab === 'admin' ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'scale-100'}`}>⚙️</span>
