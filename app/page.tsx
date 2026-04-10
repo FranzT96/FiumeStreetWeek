@@ -69,7 +69,7 @@ export default function Home() {
     { id: 'd16', match_time: '22:10', court: 'A', status: 'programmata', is_event: false },
   ];
 
-  // Dummy Shop Items mappati sui file locali (nel caso il DB non risponda o sia vuoto)
+  // Dummy Shop Items mappati sui file locali
   const dummyShopItems = [
     { id: 's1', name: 'Canotta FSW Nera', type: 'canotte', base_price: 25, image_url: '/shop/Nera.png' },
     { id: 's2', name: 'Canotta FSW Bianca', type: 'canotte', base_price: 25, image_url: '/shop/Bianca.png' },
@@ -429,7 +429,7 @@ export default function Home() {
     setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max}));
   };
 
-  // --- SHOP LOGIC CON GESTIONE ERRORI IN-MODAL ---
+  // --- SHOP LOGIC ---
   const submitBid = async () => {
     setBidError(null); 
 
@@ -469,7 +469,7 @@ export default function Home() {
       setBidForm({ name: '', contact: '', amount: '' });
       setBidError(null);
       showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata. Se sarai il vincitore verrai contattato a fine asta!");
-      fetchData(); // Aggiorna per l'admin
+      fetchData(); 
     }
   };
 
@@ -488,7 +488,7 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO: VISIBILE SOLO NELLA HOME ORA */}
+        {/* LOGO: VISIBILE SOLO NELLA HOME */}
         {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
@@ -580,7 +580,6 @@ export default function Home() {
                 <div className="col-span-full p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun articolo al momento.</div>
               ) : (
                 shopItems.filter(i => i.type === activeShopTab).map((item) => {
-                  // --- LOGICA CAROSELLO FOTO (Corretta TS implicity any) ---
                   const images = item.image_url ? item.image_url.split(',').map((u: string) => u.trim()) : [];
                   const imgIdx = currentImageIndexes[item.id] || 0;
                   const currentImage = images[imgIdx] || 'https://via.placeholder.com/400x500/0f172a/06b6d4?text=FOTO+NON+DISPONIBILE';
@@ -595,7 +594,6 @@ export default function Home() {
                           <div className="absolute top-2 right-2 bg-pink-600 text-white text-[9px] font-black uppercase px-2 py-1 rounded shadow-md animate-pulse z-10">Asta al Buio</div>
                         )}
 
-                        {/* CONTROLLI CAROSELLO */}
                         {images.length > 1 && (
                           <>
                             <button onClick={(e) => prevImage(e, item.id, images.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm opacity-80 hover:opacity-100 transition-opacity active:scale-95">{'<'}</button>
@@ -622,7 +620,7 @@ export default function Home() {
                         {item.type === 'limited' ? (
                           <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">Fai un'offerta 🤫</button>
                         ) : (
-                          <button className="w-full bg-slate-800 text-slate-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest cursor-not-allowed mt-auto">Acquista al banco</button>
+                          <button onClick={() => showAlert("Corri al Bar! 🍻", "Le canotte ufficiali FSW ti aspettano al bar dell'evento! Vai a sceglierla, provala e falla tua prima che finiscano le taglie.")} className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg active:scale-95 mt-auto">Acquista al bar</button>
                         )}
                       </div>
                     </div>
