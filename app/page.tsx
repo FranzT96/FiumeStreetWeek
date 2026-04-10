@@ -44,7 +44,7 @@ export default function Home() {
   // --- STATI PER AUTH E MENU ADMIN ---
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
   const [email, setEmail] = useState('');
@@ -52,7 +52,6 @@ export default function Home() {
   const [regName, setRegName] = useState('');
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
-  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
   const groups = ['A', 'B', 'C', 'D'];
@@ -148,13 +147,36 @@ export default function Home() {
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
+  // --- LOGICA AUTH COMPLETA (Login, Register, Reset Password Sicuro) ---
   const handleAuthAction = async () => {
-    if (!email || !password) {
-      showAlert("Dati mancanti", "Inserisci email e password.");
+    setIsAuthLoading(true);
+
+    if (authMode === 'reset') {
+      if (!email) {
+        showAlert("Dati mancanti", "Inserisci la tua email per recuperare la password.");
+        setIsAuthLoading(false);
+        return;
+      }
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+
+      if (error) {
+        showAlert("Errore", "Impossibile inviare il link. Controlla l'email.");
+      } else {
+        showAlert("Controlla la Mail", "Ti abbiamo inviato un link sicuro per reimpostare la tua password.");
+        setAuthMode('login');
+      }
+      setIsAuthLoading(false);
       return;
     }
-    
-    setIsAuthLoading(true);
+
+    if (!email || !password) {
+      showAlert("Dati mancanti", "Inserisci email e password.");
+      setIsAuthLoading(false);
+      return;
+    }
     
     if (authMode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -186,7 +208,7 @@ export default function Home() {
         setEmail(''); setPassword(''); setRegName('');
         
         if (data.user && !data.session) {
-          showAlert("ATTENZIONE", "Devi disattivare 'Confirm email' su Supabase > Authentication > Providers > Email per permettere l'accesso diretto. Altrimenti dovrai cliccare il link mandato via mail.");
+          showAlert("ATTENZIONE", "Devi disattivare 'Confirm email' su Supabase > Authentication > Providers > Email per permettere l'accesso diretto.");
         } else {
           showAlert("Fiume Street Week", "Benvenuto alla Fiume Street Week 2026");
         }
@@ -517,15 +539,14 @@ export default function Home() {
       setIsBidModalOpen(false);
       setBidForm({ amount: '' });
       setBidError(null);
-      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata. Se sarai il vincitore verrai contattato a fine asta!");
+      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata.");
       fetchData(); 
     }
   };
 
-  // Se l'auth è in fase di caricamento invisibile all'avvio
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
-  // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE ---
+  // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET ---
   if (!user) {
     return (
       <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
@@ -535,29 +556,52 @@ export default function Home() {
             <img src="/icon.png" alt="FSW Logo" className="w-40 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] object-contain" />
           </div>
           
-          <div className="flex gap-2 mb-6">
-            <button onClick={() => { setAuthMode('login'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Accedi</button>
-            <button onClick={() => { setAuthMode('register'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'register' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Registrati</button>
-          </div>
+          {authMode !== 'reset' && (
+            <div className="flex gap-2 mb-6">
+              <button onClick={() => { setAuthMode('login'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Accedi</button>
+              <button onClick={() => { setAuthMode('register'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'register' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Registrati</button>
+            </div>
+          )}
 
-          <div className="space-y-4 mb-8">
+          {authMode === 'reset' && (
+            <div className="mb-6 text-center">
+              <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2">Recupera Password</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Inserisci la tua email per ricevere il link magico.</p>
+            </div>
+          )}
+
+          <div className="space-y-4 mb-6">
             <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             
+            {authMode !== 'reset' && (
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+            )}
+            
+            {authMode === 'login' && (
+              <div className="text-right">
+                <button onClick={() => setAuthMode('reset')} className="text-slate-500 hover:text-cyan-400 text-[10px] font-black uppercase tracking-widest transition-colors">Password dimenticata?</button>
+              </div>
+            )}
+
             {authMode === 'register' && (
-              <div className="space-y-4 pt-4 border-t border-slate-800 mt-4">
+              <div className="space-y-4 pt-2 border-t border-slate-800 mt-2">
                 <div>
                   <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Nome e Cognome</label>
                   <input type="text" placeholder="Mario Rossi" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 uppercase font-black" />
                 </div>
               </div>
             )}
-
           </div>
 
-          <button onClick={handleAuthAction} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : 'bg-pink-500 text-white active:scale-95'}`}>
-            {isAuthLoading ? 'Caricamento...' : authMode === 'login' ? 'Entra nel Torneo' : 'Crea Account'}
-          </button>
+          <div className="flex flex-col gap-3">
+            <button onClick={handleAuthAction} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : authMode === 'register' ? 'bg-pink-500 text-white active:scale-95' : 'bg-orange-500 text-slate-900 active:scale-95'}`}>
+              {isAuthLoading ? 'Caricamento...' : authMode === 'login' ? 'Entra nel Torneo' : authMode === 'register' ? 'Crea Account' : 'Invia Link di Recupero'}
+            </button>
+            
+            {authMode === 'reset' && (
+              <button onClick={() => setAuthMode('login')} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full hover:text-white transition-colors">Torna al Login</button>
+            )}
+          </div>
         </div>
 
         {/* MODALE ALERTS PER LA SCHERMATA LOGIN */}
@@ -899,6 +943,9 @@ export default function Home() {
                       <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
+                      <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
+                        <span className="text-sm">🚪</span> Logout Admin
+                      </button>
                     </div>
                   </>
                 )}
@@ -1180,7 +1227,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Ridisegnato per evitare tagli) --- */}
+      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
         <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
