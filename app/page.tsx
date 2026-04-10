@@ -4,6 +4,10 @@ import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase';
 
 export default function Home() {
+  // --- CONFIGURAZIONE ADMIN ---
+  // Inserisci qui l'email che userai come amministratore del torneo
+  const ADMIN_EMAIL = 'fiumestreetweek@gmail.com';
+
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
@@ -29,20 +33,25 @@ export default function Home() {
   // --- ASTE STATE ---
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [selectedBidItem, setSelectedBidItem] = useState<any | null>(null);
-  const [bidForm, setBidForm] = useState({ name: '', contact: '', amount: '' });
+  const [bidForm, setBidForm] = useState({ amount: '' }); // Nome e contatto li prendiamo dall'utente loggato
   const [openedEnvelopes, setOpenedEnvelopes] = useState<Record<number, boolean>>({});
-  
-  // --- NUOVI STATI PER LA UX DELLE OFFERTE E CAROSELLO ---
   const [bidError, setBidError] = useState<string | null>(null); 
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
   const [currentImageIndexes, setCurrentImageIndexes] = useState<Record<number | string, number>>({});
 
   // --- STATI PER AUTH E MENU ADMIN ---
+  const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
+  
+  // Auth Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
   const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -78,6 +87,21 @@ export default function Home() {
     { id: 's5', name: 'Canotta Curry - Limited', type: 'limited', base_price: 15, image_url: '/shop/Curry.png' }
   ];
 
+  const checkSession = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      setUser(session.user);
+      if (session.user.email === ADMIN_EMAIL) {
+        setIsAdminUnlocked(true);
+      } else {
+        setIsAdminUnlocked(false);
+      }
+    } else {
+      setUser(null);
+      setIsAdminUnlocked(false);
+    }
+  };
+
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
@@ -85,9 +109,9 @@ export default function Home() {
     // Fetch Shop Data
     const { data: shopData, error: shopError } = await supabase.from('shop_items').select('*');
     
-    // Solo Admin vede le offerte
+    // Controlla sessione e fetch bids solo se admin
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    if (session && session.user.email === ADMIN_EMAIL) {
       const { data: bidsData } = await supabase.from('bids').select('*').order('amount', { ascending: false });
       if (bidsData) setBids(bidsData);
     }
@@ -106,11 +130,13 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) setIsAdminUnlocked(true);
-    };
     checkSession();
+
+    // Ascolta i cambiamenti di autenticazione in tempo reale
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      checkSession();
+      if (event === 'SIGNED_IN') fetchData();
+    });
 
     const channelGames = supabase.channel('realtime-games').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games' }, () => { fetchData(); }).subscribe();
     const channelTeams = supabase.channel('realtime-teams').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, () => { fetchData(); }).subscribe();
@@ -118,35 +144,76 @@ export default function Home() {
     
     return () => { 
       supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); 
+      authListener.subscription.unsubscribe();
     };
   }, []);
 
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
+  // --- LOGICA AUTH ---
+  const handleAuthAction = async () => {
+    if (authMode === 'login') {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) { 
+        showAlert("Errore Login", "Credenziali non valide. Riprova."); 
+      } else { 
+        setIsAuthModalOpen(false); 
+        setEmail(''); setPassword('');
+        if (data.user?.email === ADMIN_EMAIL) setActiveTab('admin');
+      }
+    } else {
+      // Register
+      if (!email || !password || !regName || !regPhone) {
+        showAlert("Dati mancanti", "Compila tutti i campi per registrarti.");
+        return;
+      }
+      const { data, error } = await supabase.auth.signUp({
+        email, 
+        password,
+        options: {
+          data: {
+            full_name: regName,
+            phone: regPhone
+          }
+        }
+      });
+
+      if (error) {
+        showAlert("Errore Registrazione", error.message);
+      } else {
+        setIsAuthModalOpen(false);
+        setEmail(''); setPassword(''); setRegName(''); setRegPhone('');
+        showAlert("Benvenuto!", "Registrazione completata. Ora puoi fare le tue offerte!");
+        if (data.user?.email === ADMIN_EMAIL) setActiveTab('admin');
+      }
+    }
+  };
+
+  const promptLogout = () => {
+    setModal({
+      isOpen: true,
+      title: "Logout",
+      message: "Sei sicuro di voler uscire dal tuo account?",
+      type: 'confirm',
+      onConfirm: async () => {
+        await supabase.auth.signOut();
+        setActiveTab('home');
+        closeModal();
+      }
+    });
+  };
+
   const handlePointerDown = () => {
     pressTimerRef.current = setTimeout(async () => {
       if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(150);
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) { setIsAdminUnlocked(true); setActiveTab('admin'); } 
-      else { setIsLoginModalOpen(true); }
+      if (session && session.user.email === ADMIN_EMAIL) { setIsAdminUnlocked(true); setActiveTab('admin'); } 
+      else { setAuthMode('login'); setIsAuthModalOpen(true); }
     }, 3000);
   };
 
   const handlePointerUp = () => { if (pressTimerRef.current) clearTimeout(pressTimerRef.current); };
-
-  const handleLogin = async () => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { showAlert("Errore Login", "Credenziali non valide. Riprova."); } 
-    else { setIsAdminUnlocked(true); setIsLoginModalOpen(false); setActiveTab('admin'); setEmail(''); setPassword(''); fetchData(); }
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setIsAdminUnlocked(false);
-    setIsAdminMenuOpen(false);
-    setActiveTab('home');
-  };
 
   const resetTournament = () => {
     setModal({
@@ -429,12 +496,12 @@ export default function Home() {
     setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max}));
   };
 
-  // --- SHOP LOGIC CON GESTIONE ERRORI IN-MODAL ---
+  // --- SHOP LOGIC (Offerte Anti-Troll) ---
   const submitBid = async () => {
     setBidError(null); 
 
-    if (!bidForm.name || !bidForm.contact || !bidForm.amount) {
-      setBidError("Compila tutti i campi per fare l'offerta.");
+    if (!bidForm.amount) {
+      setBidError("Inserisci una cifra per l'offerta.");
       return;
     }
     
@@ -450,12 +517,16 @@ export default function Home() {
       return;
     }
 
+    // Prende i dati in modo sicuro dai metadata dell'utente loggato
+    const userName = user?.user_metadata?.full_name || user?.email;
+    const userPhone = user?.user_metadata?.phone || 'Nessun telefono';
+
     setIsSubmittingBid(true);
 
     const { error } = await supabase.from('bids').insert({
       item_id: selectedBidItem.id,
-      bidder_name: bidForm.name.toUpperCase(),
-      contact_info: bidForm.contact,
+      bidder_name: userName.toUpperCase(),
+      contact_info: userPhone,
       amount: amountNum
     });
 
@@ -466,10 +537,23 @@ export default function Home() {
       setBidError("Errore di connessione. Riprova tra poco.");
     } else {
       setIsBidModalOpen(false);
-      setBidForm({ name: '', contact: '', amount: '' });
+      setBidForm({ amount: '' });
       setBidError(null);
       showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata. Se sarai il vincitore verrai contattato a fine asta!");
-      fetchData(); // Aggiorna per l'admin
+      fetchData(); 
+    }
+  };
+
+  const handleBidClick = (item: any) => {
+    if (!user) {
+      // Se non è loggato, apre la modale di login/registrazione
+      setAuthMode('register');
+      setIsAuthModalOpen(true);
+    } else {
+      // Se è loggato, procede con l'offerta
+      setSelectedBidItem(item);
+      setIsBidModalOpen(true);
+      setBidError(null);
     }
   };
 
@@ -488,10 +572,10 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO: VISIBILE SOLO NELLA HOME */}
+        {/* LOGO (Ora senza Easter Egg, accessibile a tutti, visualizzato solo nella home) */}
         {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
-            <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
+            <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
           </div>
         )}
 
@@ -587,7 +671,6 @@ export default function Home() {
                   return (
                     <div key={item.id} className={`bg-slate-900 rounded-2xl overflow-hidden border-2 shadow-xl flex flex-col ${item.type === 'limited' ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(236,72,153,1)]' : 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]'}`}>
                       
-                      {/* CONTENITORE IMMAGINI A 2:3 PER FITTARE LE FOTO 333x500 */}
                       <div className="aspect-[2/3] bg-slate-800 relative group">
                         <img src={currentImage} alt={`${item.name} - Foto ${imgIdx + 1}`} className="w-full h-full object-cover transition-opacity duration-300" />
                         
@@ -619,7 +702,9 @@ export default function Home() {
                         </div>
                         
                         {item.type === 'limited' ? (
-                          <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">Fai un'offerta 🤫</button>
+                          <button onClick={() => handleBidClick(item)} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">
+                            {user ? 'Fai un\'offerta 🤫' : 'Accedi per Offrire'}
+                          </button>
                         ) : (
                           <button onClick={() => showAlert("Corri al Bar! 🍻", "Le canotte ufficiali FSW ti aspettano al bar dell'evento! Vai a sceglierla, provala e falla tua prima che finiscano le taglie.")} className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg active:scale-95 mt-auto">Acquista al bar</button>
                         )}
@@ -798,9 +883,6 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
                         <span className="text-sm">🗑️</span> Azzera Torneo
-                      </button>
-                      <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
-                        <span className="text-sm">🚪</span> Logout Admin
                       </button>
                     </div>
                   </>
@@ -1081,57 +1163,144 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
+      {/* --- MENU BASSO DINAMICO (6 Icone con Logica Auth) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
-        <div className="flex justify-around items-center max-w-xl mx-auto p-2">
-          <button onClick={() => setActiveTab('home')} className={`flex-1 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
-            <span className="text-xl mb-1">🔥</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest">Live</span>
+        <div className="flex justify-between items-center max-w-xl mx-auto p-1 sm:p-2">
+          <button onClick={() => setActiveTab('home')} className={`w-1/6 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
+            <span className="text-lg sm:text-xl mb-1">🔥</span>
+            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Live</span>
           </button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex-1 flex flex-col items-center ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}>
-            <span className="text-xl mb-1">📊</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest">Gironi</span>
+          <button onClick={() => setActiveTab('gironi')} className={`w-1/6 flex flex-col items-center ${activeTab === 'gironi' ? 'text-cyan-400' : 'text-slate-500'}`}>
+            <span className="text-lg sm:text-xl mb-1">📊</span>
+            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Gironi</span>
           </button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex-1 flex flex-col items-center ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}>
-            <span className="text-xl mb-1">📅</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest">Orari</span>
+          <button onClick={() => setActiveTab('calendario')} className={`w-1/6 flex flex-col items-center ${activeTab === 'calendario' ? 'text-orange-500' : 'text-slate-500'}`}>
+            <span className="text-lg sm:text-xl mb-1">📅</span>
+            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Orari</span>
           </button>
-          <button onClick={() => setActiveTab('playoff')} className={`flex-1 flex flex-col items-center ${activeTab === 'playoff' ? 'text-pink-600' : 'text-slate-500'}`}>
-            <span className="text-xl mb-1">🏆</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest">Playoff</span>
+          <button onClick={() => setActiveTab('playoff')} className={`w-1/6 flex flex-col items-center ${activeTab === 'playoff' ? 'text-pink-600' : 'text-slate-500'}`}>
+            <span className="text-lg sm:text-xl mb-1">🏆</span>
+            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Playoff</span>
           </button>
-          <button onClick={() => setActiveTab('shop')} className={`flex-1 flex flex-col items-center ${activeTab === 'shop' ? 'text-purple-400' : 'text-slate-500'}`}>
-            <span className="text-xl mb-1">🛍️</span>
-            <span className="text-[8px] font-black uppercase italic tracking-widest">Shop</span>
+          <button onClick={() => setActiveTab('shop')} className={`w-1/6 flex flex-col items-center ${activeTab === 'shop' ? 'text-purple-400' : 'text-slate-500'}`}>
+            <span className="text-lg sm:text-xl mb-1">🛍️</span>
+            <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Shop</span>
           </button>
           
-          {isAdminUnlocked && (
-            <button onClick={() => setActiveTab('admin')} className={`flex-1 flex flex-col items-center animate-fade-in ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}>
-              <span className="text-xl mb-1">⚙️</span>
-              <span className="text-[8px] font-black uppercase italic tracking-widest text-white">Admin</span>
+          {/* ICONA DINAMICA: LOGIN / ADMIN / LOGOUT */}
+          {!user ? (
+            <button onClick={() => { setAuthMode('login'); setIsAuthModalOpen(true); }} className="w-1/6 flex flex-col items-center text-slate-500 hover:text-white transition-colors">
+              <span className="text-lg sm:text-xl mb-1">👤</span>
+              <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Accedi</span>
+            </button>
+          ) : isAdminUnlocked ? (
+            <button onClick={() => setActiveTab('admin')} className={`w-1/6 flex flex-col items-center animate-fade-in ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}>
+              <span className="text-lg sm:text-xl mb-1">⚙️</span>
+              <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center text-white">Admin</span>
+            </button>
+          ) : (
+            <button onClick={promptLogout} className="w-1/6 flex flex-col items-center text-red-500 hover:text-red-400 transition-colors">
+              <span className="text-lg sm:text-xl mb-1">🚪</span>
+              <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Esci</span>
             </button>
           )}
         </div>
       </nav>
 
-      {/* --- MODALE LOGIN --- */}
-      {isLoginModalOpen && (
+      {/* --- MODALE AUTHENTICAZIONE COMBINATA (LOGIN/REGISTER) --- */}
+      {isAuthModalOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-8 max-w-xs w-full shadow-2xl">
-            <h3 className="text-2xl font-black uppercase mb-6 text-center text-cyan-400 italic tracking-widest">Admin Login</h3>
-            <div className="space-y-4 mb-8">
+          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)]">
+            
+            <div className="flex gap-2 mb-6">
+              <button onClick={() => { setAuthMode('login'); setBidError(null); }} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50'}`}>Accedi</button>
+              <button onClick={() => { setAuthMode('register'); setBidError(null); }} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${authMode === 'register' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50'}`}>Registrati</button>
+            </div>
+
+            <div className="space-y-4 mb-6">
               <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
               <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
+              
+              {authMode === 'register' && (
+                <div className="space-y-4 pt-2 border-t border-slate-800 mt-2">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Nome e Cognome</label>
+                    <input type="text" placeholder="Mario Rossi" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 uppercase font-black" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Contatto (Ig o Num. Telefono)</label>
+                    <input type="text" placeholder="@mariorossi / 333..." value={regPhone} onChange={(e) => setRegPhone(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
+                  </div>
+                </div>
+              )}
             </div>
+
             <div className="flex flex-col gap-3">
-              <button onClick={handleLogin} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full">Entra</button>
-              <button onClick={() => setIsLoginModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
+              <button onClick={handleAuthAction} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full hover:bg-cyan-400 active:scale-95 transition-all">
+                {authMode === 'login' ? 'Entra' : 'Crea Account'}
+              </button>
+              <button onClick={() => setIsAuthModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODALE CREA GIOCO/EVENTO --- */}
+      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata e sicura) --- */}
+      {isBidModalOpen && selectedBidItem && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
+            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
+            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
+            
+            {bidError && (
+              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
+                {bidError}
+              </div>
+            )}
+
+            <div className="space-y-4 mb-8">
+              {/* Dati bloccati e letti dal profilo utente loggato */}
+              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
+                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Stai offrendo come:</p>
+                <p className="text-sm text-slate-300 font-black uppercase">{user?.user_metadata?.full_name || user?.email}</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user?.user_metadata?.phone}</p>
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black uppercase text-pink-500 tracking-widest block mb-1">La tua offerta (€)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
+                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-pink-900 text-xl outline-none focus:border-pink-500 font-black transition-colors" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={submitBid} 
+                disabled={isSubmittingBid}
+                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
+              >
+                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
+              </button>
+              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE ALERTS --- */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
+            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE CREA GIOCO/EVENTO (ADMIN) --- */}
       {isNewGameModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -1191,7 +1360,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE EDIT GIOCO/EVENTO --- */}
+      {/* --- MODALE EDIT GIOCO/EVENTO (ADMIN) --- */}
       {gameToEdit && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -1247,63 +1416,6 @@ export default function Home() {
               <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
               <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE FAI OFFERTA --- */}
-      {isBidModalOpen && selectedBidItem && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
-            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
-            
-            {/* MESSAGGIO DI ERRORE IN-MODAL */}
-            {bidError && (
-              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
-                {bidError}
-              </div>
-            )}
-
-            <div className="space-y-4 mb-8">
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-1">Nome e Cognome</label>
-                <input type="text" placeholder="Mario Rossi" value={bidForm.name} onChange={(e) => setBidForm({...bidForm, name: e.target.value})} className="w-full bg-black text-white p-3 rounded-xl border border-slate-800 text-sm outline-none focus:border-pink-500 uppercase font-black" />
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-1">Contatto (Ig o Num. Telefono)</label>
-                <input type="text" placeholder="@mariorossi / 333..." value={bidForm.contact} onChange={(e) => setBidForm({...bidForm, contact: e.target.value})} className="w-full bg-black text-white p-3 rounded-xl border border-slate-800 text-sm outline-none focus:border-pink-500 font-mono" />
-                <p className="text-[8px] text-slate-500 mt-1 italic">Nascosto al pubblico. Serve per contattarti se vinci.</p>
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-1">La tua offerta (€)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
-                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({...bidForm, amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-slate-800 text-xl outline-none focus:border-pink-500 font-black" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={submitBid} 
-                disabled={isSubmittingBid}
-                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
-              >
-                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
-              </button>
-              <button onClick={() => { setIsBidModalOpen(false); setBidForm({name: '', contact: '', amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal.isOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black">Conferma</button></div>
           </div>
         </div>
       )}
