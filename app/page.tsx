@@ -5,10 +5,11 @@ import { createClient } from '@/utils/supabase';
 
 export default function Home() {
   // --- CONFIGURAZIONE ADMIN ---
-  // Inserisci qui l'email che userai come amministratore del torneo
   const ADMIN_EMAIL = 'fiumestreetweek@gmail.com';
 
   const [loading, setLoading] = useState(true);
+  const [authChecking, setAuthChecking] = useState(true);
+  
   const [teams, setTeams] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
   
@@ -19,7 +20,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
   const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
-  const [activeShopTab, setActiveShopTab] = useState('canotte'); // canotte | limited
+  const [activeShopTab, setActiveShopTab] = useState('canotte'); 
   
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
@@ -33,7 +34,7 @@ export default function Home() {
   // --- ASTE STATE ---
   const [isBidModalOpen, setIsBidModalOpen] = useState(false);
   const [selectedBidItem, setSelectedBidItem] = useState<any | null>(null);
-  const [bidForm, setBidForm] = useState({ amount: '' }); // Nome e contatto li prendiamo dall'utente loggato
+  const [bidForm, setBidForm] = useState({ amount: '' }); 
   const [openedEnvelopes, setOpenedEnvelopes] = useState<Record<number, boolean>>({});
   const [bidError, setBidError] = useState<string | null>(null); 
   const [isSubmittingBid, setIsSubmittingBid] = useState(false);
@@ -42,18 +43,14 @@ export default function Home() {
   // --- STATI PER AUTH E MENU ADMIN ---
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
-  // Auth Form Fields
+  // Auth Form Fields (Semplificato)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [regName, setRegName] = useState('');
-  const [regPhone, setRegPhone] = useState('');
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
-  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
   const groups = ['A', 'B', 'C', 'D'];
@@ -66,19 +63,8 @@ export default function Home() {
     { id: 'd4', match_time: '19:20', court: 'B', status: 'programmata', is_event: false },
     { id: 'd5', match_time: '19:40', court: 'A', status: 'programmata', is_event: false },
     { id: 'd6', match_time: '19:40', court: 'B', status: 'programmata', is_event: false },
-    { id: 'd7', match_time: '20:00', court: 'A', status: 'programmata', is_event: false },
-    { id: 'd8', match_time: '20:00', court: 'B', status: 'programmata', is_event: false },
-    { id: 'd9', match_time: '20:20', court: 'A', status: 'programmata', is_event: false },
-    { id: 'd10', match_time: '20:20', court: 'B', status: 'programmata', is_event: false },
-    { id: 'd11', match_time: '20:40', court: 'A', status: 'programmata', is_event: false },
-    { id: 'd12', match_time: '20:40', court: 'B', status: 'programmata', is_event: false },
-    { id: 'd13', match_time: '21:00', court: 'A', status: 'programmata', is_event: false },
-    { id: 'd14', match_time: '21:20', court: 'A', status: 'programmata', is_event: false },
-    { id: 'd15', match_time: '21:40', court: 'A', status: 'programmata', is_event: false },
-    { id: 'd16', match_time: '22:10', court: 'A', status: 'programmata', is_event: false },
   ];
 
-  // Dummy Shop Items mappati sui file locali
   const dummyShopItems = [
     { id: 's1', name: 'Canotta FSW Nera', type: 'canotte', base_price: 25, image_url: '/shop/Nera.png' },
     { id: 's2', name: 'Canotta FSW Bianca', type: 'canotte', base_price: 25, image_url: '/shop/Bianca.png' },
@@ -87,32 +73,38 @@ export default function Home() {
     { id: 's5', name: 'Canotta Curry - Limited', type: 'limited', base_price: 15, image_url: '/shop/Curry.png' }
   ];
 
+  // --- ESTRATTORE NOME DA EMAIL ---
+  const extractNameFromEmail = (userEmail: string) => {
+    if (!userEmail) return 'Anonimo';
+    const namePart = userEmail.split('@')[0];
+    const cleanName = namePart.replace(/[._-]/g, ' ');
+    return cleanName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
   const checkSession = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       setUser(session.user);
-      if (session.user.email === ADMIN_EMAIL) {
-        setIsAdminUnlocked(true);
-      } else {
-        setIsAdminUnlocked(false);
-      }
+      setIsAdminUnlocked(session.user.email === ADMIN_EMAIL);
     } else {
       setUser(null);
       setIsAdminUnlocked(false);
     }
+    setAuthChecking(false);
   };
 
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
     
-    // Fetch Shop Data
     const { data: shopData, error: shopError } = await supabase.from('shop_items').select('*');
     
-    // Controlla sessione e fetch bids solo se admin
+    // Fetch bids solo per l'Admin, ordinati per prezzo (DESC) e per orario (ASC)
     const { data: { session } } = await supabase.auth.getSession();
     if (session && session.user.email === ADMIN_EMAIL) {
-      const { data: bidsData } = await supabase.from('bids').select('*').order('amount', { ascending: false });
+      const { data: bidsData } = await supabase.from('bids').select('*')
+        .order('amount', { ascending: false })
+        .order('created_at', { ascending: true }); // A parità di cifra, il primo vince
       if (bidsData) setBids(bidsData);
     }
 
@@ -129,13 +121,14 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchData();
     checkSession();
 
-    // Ascolta i cambiamenti di autenticazione in tempo reale
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       checkSession();
-      if (event === 'SIGNED_IN') fetchData();
+      if (event === 'SIGNED_IN') {
+        fetchData();
+        setActiveTab('home');
+      }
     });
 
     const channelGames = supabase.channel('realtime-games').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games' }, () => { fetchData(); }).subscribe();
@@ -148,46 +141,31 @@ export default function Home() {
     };
   }, []);
 
+  // Se siamo loggati, carichiamo i dati
+  useEffect(() => {
+    if (user) fetchData();
+  }, [user]);
+
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH ---
+  // --- LOGICA AUTH (Semplificata, solo email e pass) ---
   const handleAuthAction = async () => {
-    if (authMode === 'login') {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) { 
-        showAlert("Errore Login", "Credenziali non valide. Riprova."); 
-      } else { 
-        setIsAuthModalOpen(false); 
-        setEmail(''); setPassword('');
-        if (data.user?.email === ADMIN_EMAIL) setActiveTab('admin');
-      }
-    } else {
-      // Register
-      if (!email || !password || !regName || !regPhone) {
-        showAlert("Dati mancanti", "Compila tutti i campi per registrarti.");
-        return;
-      }
-      const { data, error } = await supabase.auth.signUp({
-        email, 
-        password,
-        options: {
-          data: {
-            full_name: regName,
-            phone: regPhone
-          }
-        }
-      });
-
-      if (error) {
-        showAlert("Errore Registrazione", error.message);
-      } else {
-        setIsAuthModalOpen(false);
-        setEmail(''); setPassword(''); setRegName(''); setRegPhone('');
-        showAlert("Benvenuto!", "Registrazione completata. Ora puoi fare le tue offerte!");
-        if (data.user?.email === ADMIN_EMAIL) setActiveTab('admin');
-      }
+    if (!email || !password) {
+      showAlert("Dati mancanti", "Inserisci email e password.");
+      return;
     }
+    
+    setLoading(true);
+    
+    if (authMode === 'login') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) showAlert("Errore Login", "Credenziali non valide. Controlla e riprova."); 
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) showAlert("Errore", error.message);
+    }
+    setLoading(false);
   };
 
   const promptLogout = () => {
@@ -198,62 +176,30 @@ export default function Home() {
       type: 'confirm',
       onConfirm: async () => {
         await supabase.auth.signOut();
-        setActiveTab('home');
+        setEmail(''); setPassword('');
         closeModal();
       }
     });
   };
 
-  const handlePointerDown = () => {
-    pressTimerRef.current = setTimeout(async () => {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(150);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session && session.user.email === ADMIN_EMAIL) { setIsAdminUnlocked(true); setActiveTab('admin'); } 
-      else { setAuthMode('login'); setIsAuthModalOpen(true); }
-    }, 3000);
-  };
-
-  const handlePointerUp = () => { if (pressTimerRef.current) clearTimeout(pressTimerRef.current); };
-
+  // --- LOGICA TORNEO ---
   const resetTournament = () => {
-    setModal({
-      isOpen: true,
-      title: "⚠️ ATTENZIONE",
-      message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.",
-      type: 'confirm',
-      onConfirm: async () => {
-        closeModal();
-        setLoading(true);
-        await supabase.from('games').delete().neq('stage', 'girone');
-        await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone');
-        await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1);
-        await fetchData();
-      }
-    });
+    setModal({ isOpen: true, title: "⚠️ ATTENZIONE", message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.", type: 'confirm', onConfirm: async () => { closeModal(); setLoading(true); await supabase.from('games').delete().neq('stage', 'girone'); await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); await fetchData(); } });
   };
 
   const getStageWeight = (stage: string) => {
     if (!stage || stage === 'girone') return 0;
-    if (stage === 'ottavi') return 1;
-    if (stage === 'quarti') return 2;
-    if (stage === 'semi') return 3;
-    if (stage === 'finali') return 4;
-    return 5;
+    if (stage === 'ottavi') return 1; if (stage === 'quarti') return 2; if (stage === 'semi') return 3; if (stage === 'finali') return 4; return 5;
   };
 
   const sortedGames = [...games].sort((a, b) => {
-    const wA = getStageWeight(a.stage);
-    const wB = getStageWeight(b.stage);
+    const wA = getStageWeight(a.stage); const wB = getStageWeight(b.stage);
     if (wA !== wB) return wA - wB; 
     if (a.match_time !== b.match_time) return a.match_time.localeCompare(b.match_time);
     return a.court.localeCompare(b.court);
   });
 
-  const adminLiveGames = [
-    ...sortedGames.filter(g => g.status === 'in_corso'),
-    ...sortedGames.filter(g => g.status === 'programmata'),
-    ...sortedGames.filter(g => g.status === 'finita')
-  ];
+  const adminLiveGames = [ ...sortedGames.filter(g => g.status === 'in_corso'), ...sortedGames.filter(g => g.status === 'programmata'), ...sortedGames.filter(g => g.status === 'finita') ];
 
   const generateBracket = async () => {
     if (games.some(g => g.stage && g.stage !== 'girone')) {
@@ -420,14 +366,13 @@ export default function Home() {
     if (!newGame.is_event && (!newGame.home_id || !newGame.away_id)) return;
     if (newGame.is_event && !newGame.event_description) return;
 
-    setIsNewGameModalOpen(false); // Chiusura immediata
+    setIsNewGameModalOpen(false); 
     setLoading(true);
     
     const duration = parseInt(newGame.event_duration) || 0;
 
     if (newGame.is_event && duration > 0) {
       const isQualifiche = newGame.stage === 'girone';
-      
       const gamesToShift = games.filter(g => {
         const isGameQualifiche = !g.stage || g.stage === 'girone';
         return isQualifiche === isGameQualifiche && g.match_time >= newGame.time;
@@ -486,17 +431,10 @@ export default function Home() {
   };
 
   // --- FUNZIONI CAROSELLO IMMAGINI ---
-  const nextImage = (e: React.MouseEvent, itemId: string | number, max: number) => {
-    e.stopPropagation();
-    setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) + 1) % max}));
-  };
+  const nextImage = (e: React.MouseEvent, itemId: string | number, max: number) => { e.stopPropagation(); setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) + 1) % max})); };
+  const prevImage = (e: React.MouseEvent, itemId: string | number, max: number) => { e.stopPropagation(); setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max})); };
 
-  const prevImage = (e: React.MouseEvent, itemId: string | number, max: number) => {
-    e.stopPropagation();
-    setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max}));
-  };
-
-  // --- SHOP LOGIC (Offerte Anti-Troll) ---
+  // --- SHOP LOGIC (Offerte Anti-Troll e Upserting) ---
   const submitBid = async () => {
     setBidError(null); 
 
@@ -517,18 +455,37 @@ export default function Home() {
       return;
     }
 
-    // Prende i dati in modo sicuro dai metadata dell'utente loggato
-    const userName = user?.user_metadata?.full_name || user?.email;
-    const userPhone = user?.user_metadata?.phone || 'Nessun telefono';
-
     setIsSubmittingBid(true);
+    
+    const userEmail = user?.email || '';
+    const userName = extractNameFromEmail(userEmail);
+    const newTimestamp = new Date().toISOString();
 
-    const { error } = await supabase.from('bids').insert({
-      item_id: selectedBidItem.id,
-      bidder_name: userName.toUpperCase(),
-      contact_info: userPhone,
-      amount: amountNum
-    });
+    // Controlliamo se esiste già un'offerta per questa canotta da questo utente
+    const { data: existingBids, error: fetchError } = await supabase.from('bids')
+      .select('id')
+      .eq('item_id', selectedBidItem.id)
+      .eq('contact_info', userEmail);
+
+    let error = null;
+
+    if (existingBids && existingBids.length > 0) {
+      // Upsert: aggiorna il prezzo e il timestamp
+      const { error: updateError } = await supabase.from('bids')
+        .update({ amount: amountNum, bidder_name: userName, created_at: newTimestamp })
+        .eq('id', existingBids[0].id);
+      error = updateError;
+    } else {
+      // Inserimento nuova offerta
+      const { error: insertError } = await supabase.from('bids').insert({
+        item_id: selectedBidItem.id,
+        bidder_name: userName,
+        contact_info: userEmail,
+        amount: amountNum,
+        created_at: newTimestamp
+      });
+      error = insertError;
+    }
 
     setIsSubmittingBid(false);
 
@@ -539,25 +496,61 @@ export default function Home() {
       setIsBidModalOpen(false);
       setBidForm({ amount: '' });
       setBidError(null);
-      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata. Se sarai il vincitore verrai contattato a fine asta!");
+      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata. Se sarai il vincitore verrai contattato a fine asta!");
       fetchData(); 
     }
   };
 
-  const handleBidClick = (item: any) => {
-    if (!user) {
-      // Se non è loggato, apre la modale di login/registrazione
-      setAuthMode('register');
-      setIsAuthModalOpen(true);
-    } else {
-      // Se è loggato, procede con l'offerta
-      setSelectedBidItem(item);
-      setIsBidModalOpen(true);
-      setBidError(null);
-    }
-  };
+  // Se l'auth è ancora in fase di caricamento, mostriamo spinner
+  if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
-  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione...</div>;
+  // Se non c'è l'utente, forziamo la schermata di login esclusiva
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
+        <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] animate-fade-in relative overflow-hidden">
+          
+          <div className="flex justify-center mb-8">
+            <img src="/icon.png" alt="FSW Logo" className="w-40 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] object-contain" />
+          </div>
+          
+          <h1 className="text-2xl font-black uppercase mb-2 text-center text-white italic tracking-widest">Accesso FSW</h1>
+          <p className="text-slate-400 text-xs font-bold text-center uppercase tracking-widest mb-8">Accedi per consultare risultati, tabellone e fare offerte nello store.</p>
+          
+          <div className="flex gap-2 mb-6">
+            <button onClick={() => { setAuthMode('login'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Accedi</button>
+            <button onClick={() => { setAuthMode('register'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'register' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Registrati</button>
+          </div>
+
+          <div className="space-y-4 mb-8">
+            <div>
+              <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+              {authMode === 'register' && <p className="text-[9px] text-slate-500 mt-1 italic pl-1">Servirà per contattarti in caso di vittoria all'asta.</p>}
+            </div>
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+          </div>
+
+          <button onClick={handleAuthAction} disabled={loading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${loading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : 'bg-pink-500 text-white active:scale-95'}`}>
+            {loading ? 'Caricamento...' : authMode === 'login' ? 'Entra nel Torneo' : 'Crea Account'}
+          </button>
+        </div>
+
+        {/* MODALE ALERTS PER IL LOGIN */}
+        {modal.isOpen && (
+          <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
+              <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
+              <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+              <div className="flex justify-end gap-3"><button onClick={closeModal} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Ok</button></div>
+            </div>
+          </div>
+        )}
+      </main>
+    );
+  }
+
+  // App Principale (solo se loggati)
+  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione Dati...</div>;
 
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
   const nextGames = sortedGames.filter(g => g.status === 'programmata').slice(0, 2);
@@ -572,7 +565,7 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO (Ora senza Easter Egg, accessibile a tutti, visualizzato solo nella home) */}
+        {/* LOGO: VISIBILE SOLO NELLA HOME */}
         {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
@@ -647,7 +640,7 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- SHOP TAB (PUBBLICO) --- */}
+        {/* --- SHOP TAB --- */}
         {activeTab === 'shop' && (
           <section className="animate-fade-in space-y-6 pt-4">
             <h2 className="text-xl font-black text-purple-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic mb-4">
@@ -702,9 +695,7 @@ export default function Home() {
                         </div>
                         
                         {item.type === 'limited' ? (
-                          <button onClick={() => handleBidClick(item)} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">
-                            {user ? 'Fai un\'offerta 🤫' : 'Accedi per Offrire'}
-                          </button>
+                          <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">Fai un'offerta 🤫</button>
                         ) : (
                           <button onClick={() => showAlert("Corri al Bar! 🍻", "Le canotte ufficiali FSW ti aspettano al bar dell'evento! Vai a sceglierla, provala e falla tua prima che finiscano le taglie.")} className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg active:scale-95 mt-auto">Acquista al bar</button>
                         )}
@@ -883,6 +874,9 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
                         <span className="text-sm">🗑️</span> Azzera Torneo
+                      </button>
+                      <button onClick={promptLogout} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
+                        <span className="text-sm">🚪</span> Logout Admin
                       </button>
                     </div>
                   </>
@@ -1146,7 +1140,9 @@ export default function Home() {
                                   <span className="font-black text-white uppercase text-xs">
                                     {idx === 0 && '👑 '} {bid.bidder_name}
                                   </span>
-                                  <span className="text-[9px] text-slate-400 font-mono mt-0.5">{bid.contact_info}</span>
+                                  <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                                    {bid.contact_info} • {new Date(bid.created_at).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}
+                                  </span>
                                 </div>
                                 <span className={`font-black text-lg ${idx === 0 ? 'text-pink-400' : 'text-cyan-400'}`}>€{bid.amount}</span>
                               </li>
@@ -1163,7 +1159,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (6 Icone con Logica Auth) --- */}
+      {/* --- MENU BASSO DINAMICO (6 Icone con Logica Auth Invariata) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-between items-center max-w-xl mx-auto p-1 sm:p-2">
           <button onClick={() => setActiveTab('home')} className={`w-1/6 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
@@ -1187,13 +1183,8 @@ export default function Home() {
             <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Shop</span>
           </button>
           
-          {/* ICONA DINAMICA: LOGIN / ADMIN / LOGOUT */}
-          {!user ? (
-            <button onClick={() => { setAuthMode('login'); setIsAuthModalOpen(true); }} className="w-1/6 flex flex-col items-center text-slate-500 hover:text-white transition-colors">
-              <span className="text-lg sm:text-xl mb-1">👤</span>
-              <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center">Accedi</span>
-            </button>
-          ) : isAdminUnlocked ? (
+          {/* ICONA DINAMICA: ADMIN / LOGOUT */}
+          {isAdminUnlocked ? (
             <button onClick={() => setActiveTab('admin')} className={`w-1/6 flex flex-col items-center animate-fade-in ${activeTab === 'admin' ? 'text-white' : 'text-slate-500'}`}>
               <span className="text-lg sm:text-xl mb-1">⚙️</span>
               <span className="text-[8px] font-black uppercase italic tracking-widest truncate w-full text-center text-white">Admin</span>
@@ -1206,99 +1197,6 @@ export default function Home() {
           )}
         </div>
       </nav>
-
-      {/* --- MODALE AUTHENTICAZIONE COMBINATA (LOGIN/REGISTER) --- */}
-      {isAuthModalOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)]">
-            
-            <div className="flex gap-2 mb-6">
-              <button onClick={() => { setAuthMode('login'); setBidError(null); }} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50'}`}>Accedi</button>
-              <button onClick={() => { setAuthMode('register'); setBidError(null); }} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${authMode === 'register' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50'}`}>Registrati</button>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
-              
-              {authMode === 'register' && (
-                <div className="space-y-4 pt-2 border-t border-slate-800 mt-2">
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Nome e Cognome</label>
-                    <input type="text" placeholder="Mario Rossi" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 uppercase font-black" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Contatto (Ig o Num. Telefono)</label>
-                    <input type="text" placeholder="@mariorossi / 333..." value={regPhone} onChange={(e) => setRegPhone(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button onClick={handleAuthAction} className="bg-cyan-500 text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full hover:bg-cyan-400 active:scale-95 transition-all">
-                {authMode === 'login' ? 'Entra' : 'Crea Account'}
-              </button>
-              <button onClick={() => setIsAuthModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata e sicura) --- */}
-      {isBidModalOpen && selectedBidItem && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
-            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
-            
-            {bidError && (
-              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
-                {bidError}
-              </div>
-            )}
-
-            <div className="space-y-4 mb-8">
-              {/* Dati bloccati e letti dal profilo utente loggato */}
-              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
-                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Stai offrendo come:</p>
-                <p className="text-sm text-slate-300 font-black uppercase">{user?.user_metadata?.full_name || user?.email}</p>
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user?.user_metadata?.phone}</p>
-              </div>
-
-              <div>
-                <label className="text-[9px] font-black uppercase text-pink-500 tracking-widest block mb-1">La tua offerta (€)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
-                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-pink-900 text-xl outline-none focus:border-pink-500 font-black transition-colors" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={submitBid} 
-                disabled={isSubmittingBid}
-                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
-              >
-                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
-              </button>
-              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE ALERTS --- */}
-      {modal.isOpen && (
-        <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button></div>
-          </div>
-        </div>
-      )}
 
       {/* --- MODALE CREA GIOCO/EVENTO (ADMIN) --- */}
       {isNewGameModalOpen && (
@@ -1415,6 +1313,49 @@ export default function Home() {
             <div className="flex flex-col gap-3">
               <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
               <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata) --- */}
+      {isBidModalOpen && selectedBidItem && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
+            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
+            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
+            
+            {bidError && (
+              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
+                {bidError}
+              </div>
+            )}
+
+            <div className="space-y-4 mb-8">
+              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
+                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Stai offrendo come:</p>
+                <p className="text-sm text-slate-300 font-black uppercase">{extractNameFromEmail(user?.email)}</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user?.email}</p>
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black uppercase text-pink-500 tracking-widest block mb-1">La tua offerta (€)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
+                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-pink-900 text-xl outline-none focus:border-pink-500 font-black transition-colors" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={submitBid} 
+                disabled={isSubmittingBid}
+                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
+              >
+                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
+              </button>
+              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
             </div>
           </div>
         </div>
