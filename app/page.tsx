@@ -44,7 +44,7 @@ export default function Home() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
   
-  // FIX: Memoria di ferro per il recupero password
+  // Memoria di ferro per il recupero password
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   const isRecoveryRef = useRef(false);
   
@@ -132,7 +132,6 @@ export default function Home() {
     // 2. Ascoltatore Eventi Auth
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // L'utente ha cliccato il link
         isRecoveryRef.current = true;
         setIsRecoveringPassword(true);
         setAuthChecking(false);
@@ -140,13 +139,11 @@ export default function Home() {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
         
-        // Se NON stiamo facendo un recupero, navighiamo nell'app
         if (!isRecoveryRef.current) {
           setIsRecoveringPassword(false);
           fetchData();
           setActiveTab('home');
         } else {
-          // Se siamo in recupero, sblocca il caricamento ma mostra la modale di password
           setAuthChecking(false);
         }
       } else if (event === 'SIGNED_OUT') {
@@ -174,7 +171,6 @@ export default function Home() {
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AGGIORNAMENTO PASSWORD DA LINK ---
   const handleUpdatePassword = async () => {
     if (!password) {
       showAlert("Attenzione", "Inserisci la nuova password.");
@@ -608,8 +604,20 @@ export default function Home() {
         <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] animate-fade-in relative overflow-hidden">
           <h3 className="text-2xl font-black uppercase mb-2 text-center text-white italic tracking-widest">Nuova Password</h3>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center mb-6">Inserisci la tua nuova password per l'account.</p>
-          <input type="password" placeholder="Nuova Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors mb-6" />
-          <button onClick={handleUpdatePassword} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}>
+          
+          <input 
+            type="password" 
+            placeholder="Nuova Password" 
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors mb-6" 
+          />
+          
+          <button 
+            onClick={handleUpdatePassword} 
+            disabled={isAuthLoading} 
+            className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}
+          >
             {isAuthLoading ? 'Salvataggio...' : 'Salva e Accedi'}
           </button>
         </div>
@@ -1027,6 +1035,9 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
+                        <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
                   </>
