@@ -47,12 +47,13 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
+  // Auth Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [regName, setRegName] = useState('');
-  const [regPhone, setRegPhone] = useState('');
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createClient();
   const groups = ['A', 'B', 'C', 'D'];
@@ -148,7 +149,7 @@ export default function Home() {
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH CON UX MIGLIORATA E AVVISI ---
+  // --- LOGICA AUTH (Semplificata, solo email e nome) ---
   const handleAuthAction = async () => {
     if (!email || !password) {
       showAlert("Dati mancanti", "Inserisci email e password.");
@@ -163,23 +164,22 @@ export default function Home() {
         showAlert("Errore Login", "Credenziali non valide. Controlla e riprova."); 
       } else {
         setEmail(''); setPassword('');
-        // Il listener onAuthStateChange gestirà il redirect in background
+        // Il listener onAuthStateChange gestirà il redirect
       }
     } else {
       // Registrazione
-      if (!regName || !regPhone) {
-        showAlert("Dati mancanti", "Inserisci il tuo Nome e il tuo Contatto per registrarti.");
+      if (!regName) {
+        showAlert("Dati mancanti", "Inserisci il tuo Nome e Cognome per registrarti.");
         setIsAuthLoading(false);
         return;
       }
 
-      const { error } = await supabase.auth.signUp({ 
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
           data: {
-            full_name: regName,
-            phone: regPhone
+            full_name: regName
           }
         }
       });
@@ -187,9 +187,14 @@ export default function Home() {
       if (error) {
         showAlert("Errore Registrazione", error.message);
       } else {
-        // Successo Registrazione! Puliamo i campi e diamo il benvenuto
-        setEmail(''); setPassword(''); setRegName(''); setRegPhone('');
-        showAlert("Benvenuto! 🎉", "Registrazione avvenuta con successo. Sei stato collegato automaticamente, ora puoi consultare il torneo e fare offerte!");
+        setEmail(''); setPassword(''); setRegName('');
+        
+        // Controllo se Supabase ha bloccato il login automatico a causa delle conferme email
+        if (data.user && !data.session) {
+          showAlert("ATTENZIONE", "Devi disattivare 'Confirm email' su Supabase > Authentication > Providers > Email per permettere l'accesso diretto. Altrimenti dovrai cliccare il link mandato via mail.");
+        } else {
+          showAlert("Fiume Street Week", "Benvenuto alla Fiume Street Week 2026");
+        }
       }
     }
     setIsAuthLoading(false);
@@ -203,7 +208,7 @@ export default function Home() {
       type: 'confirm',
       onConfirm: async () => {
         await supabase.auth.signOut();
-        setEmail(''); setPassword(''); setRegName(''); setRegPhone('');
+        setEmail(''); setPassword(''); setRegName('');
         closeModal();
       }
     });
@@ -479,13 +484,14 @@ export default function Home() {
       return;
     }
 
+    // Prende i dati dell'utente dal login
     const userEmail = user?.email || '';
     const userName = user?.user_metadata?.full_name || extractNameFromEmail(userEmail);
-    const userPhone = user?.user_metadata?.phone || 'Nessun contatto registrato';
     const newTimestamp = new Date().toISOString();
 
     setIsSubmittingBid(true);
 
+    // Usa l'email come chiave univoca per aggiornare (upserting) l'offerta se esiste già
     const { data: existingBids } = await supabase.from('bids')
       .select('id')
       .eq('item_id', selectedBidItem.id)
@@ -502,7 +508,7 @@ export default function Home() {
       const { error: insertError } = await supabase.from('bids').insert({
         item_id: selectedBidItem.id,
         bidder_name: userName,
-        contact_info: userEmail, // Manteniamo la mail come ID univoco per le offerte
+        contact_info: userEmail, // Manteniamo l'email nel DB per contattarli
         amount: amountNum,
         created_at: newTimestamp
       });
@@ -518,7 +524,7 @@ export default function Home() {
       setIsBidModalOpen(false);
       setBidForm({ amount: '' });
       setBidError(null);
-      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata. Se sarai il vincitore verrai contattato a fine asta!");
+      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata.");
       fetchData(); 
     }
   };
@@ -542,9 +548,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-4 mb-8">
-            <div>
-              <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
-            </div>
+            <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             
             {/* Campi Extra solo se Registrazione */}
@@ -553,10 +557,6 @@ export default function Home() {
                 <div>
                   <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Nome e Cognome</label>
                   <input type="text" placeholder="Mario Rossi" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 uppercase font-black" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Contatto (Ig o Cellulare)</label>
-                  <input type="text" placeholder="@mariorossi / 333..." value={regPhone} onChange={(e) => setRegPhone(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
                 </div>
               </div>
             )}
@@ -1347,7 +1347,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata) --- */}
+      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA --- */}
       {isBidModalOpen && selectedBidItem && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
@@ -1394,7 +1394,7 @@ export default function Home() {
       {modal.isOpen && (
         <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
             <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
             <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button></div>
           </div>
