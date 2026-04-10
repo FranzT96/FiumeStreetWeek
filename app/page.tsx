@@ -45,7 +45,6 @@ export default function Home() {
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
-  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false); // <--- NUOVO STATO RECUPERO
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
   const [email, setEmail] = useState('');
@@ -123,16 +122,11 @@ export default function Home() {
   useEffect(() => {
     checkSession();
 
-    // --- INTERCETTATORE EVENTI AUTH (Incluso il recupero password) ---
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setIsRecoveringPassword(true);
-      } else if (event === 'SIGNED_IN') {
-        checkSession();
+      checkSession();
+      if (event === 'SIGNED_IN') {
         fetchData();
         setActiveTab('home');
-      } else {
-        checkSession();
       }
     });
 
@@ -147,33 +141,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (user && !isRecoveringPassword) fetchData();
-  }, [user, isRecoveringPassword]);
+    if (user) fetchData();
+  }, [user]);
 
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
-
-  // --- LOGICA CAMBIO PASSWORD DA LINK ---
-  const handleUpdatePassword = async () => {
-    if (!password) {
-      showAlert("Dati mancanti", "Inserisci la nuova password.");
-      return;
-    }
-    
-    setIsAuthLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setIsAuthLoading(false);
-
-    if (error) {
-      showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
-    } else {
-      setPassword('');
-      setIsRecoveringPassword(false);
-      showAlert("Fatto! 🚀", "La tua password è stata aggiornata con successo.");
-      fetchData();
-      setActiveTab('home');
-    }
-  };
 
   const handleAuthAction = async () => {
     setIsAuthLoading(true);
@@ -244,20 +216,22 @@ export default function Home() {
     setIsAuthLoading(false);
   };
 
+  const performLogout = async () => {
+    closeModal();
+    await supabase.auth.signOut();
+    setUser(null);
+    setIsAdminUnlocked(false);
+    setEmail(''); setPassword(''); setRegName('');
+    setActiveTab('home');
+  };
+
   const promptLogout = () => {
     setModal({
       isOpen: true,
       title: "Logout",
       message: "Sei sicuro di voler uscire dal tuo account?",
       type: 'confirm',
-      onConfirm: async () => {
-        closeModal();
-        await supabase.auth.signOut();
-        setUser(null);
-        setIsAdminUnlocked(false);
-        setEmail(''); setPassword(''); setRegName('');
-        setActiveTab('home');
-      }
+      onConfirm: performLogout
     });
   };
 
@@ -575,31 +549,6 @@ export default function Home() {
   };
 
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
-
-  // --- SCHERMATA AGGIORNAMENTO PASSWORD (via link email) ---
-  if (isRecoveringPassword) {
-    return (
-      <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
-        <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] animate-fade-in relative overflow-hidden">
-          <h3 className="text-2xl font-black uppercase mb-2 text-center text-white italic tracking-widest">Nuova Password</h3>
-          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center mb-6">Inserisci la tua nuova password per l'account.</p>
-          <input type="password" placeholder="Nuova Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors mb-6" />
-          <button onClick={handleUpdatePassword} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}>
-            {isAuthLoading ? 'Salvataggio...' : 'Salva e Accedi'}
-          </button>
-        </div>
-        {modal.isOpen && (
-          <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-              <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
-              <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-              <div className="flex justify-end gap-3"><button onClick={closeModal} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Ok</button></div>
-            </div>
-          </div>
-        )}
-      </main>
-    );
-  }
 
   // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET ---
   if (!user) {
@@ -998,6 +947,9 @@ export default function Home() {
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
+                        <span className="text-sm">🚪</span> Logout
+                      </button>
                     </div>
                   </>
                 )}
@@ -1279,43 +1231,43 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
-      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
-        <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+      {/* --- MENU BASSO DINAMICO (Ridisegnato e compatto per non tagliare il testo) --- */}
+      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[100] pb-safe">
+        <div className="flex justify-between items-end max-w-xl mx-auto px-2 py-2 gap-1 sm:gap-2">
+          <button onClick={() => setActiveTab('home')} className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 relative z-10 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
             <span className={`text-xl transition-all duration-200 ${activeTab === 'home' ? 'scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'scale-100'}`}>🔥</span>
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Live</span>
           </button>
           
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+          <button onClick={() => setActiveTab('gironi')} className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 relative z-10 ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
             <span className={`text-xl transition-all duration-200 ${activeTab === 'gironi' ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'scale-100'}`}>📊</span>
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Gironi</span>
           </button>
           
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+          <button onClick={() => setActiveTab('calendario')} className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 relative z-10 ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
             <span className={`text-xl transition-all duration-200 ${activeTab === 'calendario' ? 'scale-110 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'scale-100'}`}>📅</span>
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Orari</span>
           </button>
           
-          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+          <button onClick={() => setActiveTab('playoff')} className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 relative z-10 ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
             <span className={`text-xl transition-all duration-200 ${activeTab === 'playoff' ? 'scale-110 drop-shadow-[0_0_8px_rgba(219,39,119,0.8)]' : 'scale-100'}`}>🏆</span>
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Playoff</span>
           </button>
           
-          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+          <button onClick={() => setActiveTab('shop')} className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 relative z-10 ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
             <span className={`text-xl transition-all duration-200 ${activeTab === 'shop' ? 'scale-110 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]' : 'scale-100'}`}>🛍️</span>
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Shop</span>
           </button>
           
-          {/* ICONA DINAMICA: ADMIN / LOGOUT */}
+          {/* ICONA DINAMICA: ADMIN / LOGOUT (Resa perfettamente cliccabile) */}
           {isAdminUnlocked ? (
-            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
+            <button onClick={() => setActiveTab('admin')} className={`flex-1 flex flex-col items-center justify-center transition-all duration-200 relative z-10 ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
               <span className={`text-xl transition-all duration-200 ${activeTab === 'admin' ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'scale-100'}`}>⚙️</span>
               <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Admin</span>
             </button>
           ) : (
-            <button onClick={promptLogout} className="flex flex-col items-center justify-center w-[16%] text-red-500 hover:text-red-400 transition-all duration-200 active:scale-95">
-              <span className="text-xl scale-100">🚪</span>
+            <button onClick={(e) => { e.preventDefault(); promptLogout(); }} className="flex-1 flex flex-col items-center justify-center text-slate-500 hover:text-white transition-all duration-200 active:scale-95 relative z-10">
+              <span className="text-xl scale-100 drop-shadow-none">🚪</span>
               <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Esci</span>
             </button>
           )}
