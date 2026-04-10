@@ -31,8 +31,13 @@ export default function Home() {
   const [selectedBidItem, setSelectedBidItem] = useState<any | null>(null);
   const [bidForm, setBidForm] = useState({ name: '', contact: '', amount: '' });
   const [openedEnvelopes, setOpenedEnvelopes] = useState<Record<number, boolean>>({});
+  
+  // --- NUOVI STATI PER LA UX DELLE OFFERTE E CAROSELLO ---
+  const [bidError, setBidError] = useState<string | null>(null); 
+  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
+  const [currentImageIndexes, setCurrentImageIndexes] = useState<Record<number | string, number>>({});
 
-  // --- STATI PER AUTH, EASTER EGG, IMPOSTAZIONI PLAYOFF E MENU ADMIN ---
+  // --- STATI PER AUTH E MENU ADMIN ---
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
@@ -64,18 +69,20 @@ export default function Home() {
     { id: 'd16', match_time: '22:10', court: 'A', status: 'programmata', is_event: false },
   ];
 
-  // Elementi dummy per lo Shop finché il DB è vuoto
+  // Dummy Shop Items mappati sui file locali (nel caso il DB non risponda o sia vuoto)
   const dummyShopItems = [
-    { id: 's1', name: 'Canotta Ufficiale FSW Nera', type: 'canotte', base_price: 25, image_url: 'https://via.placeholder.com/400x500/0f172a/06b6d4?text=CANOTTA+FSW' },
-    { id: 's2', name: 'Canotta Ufficiale FSW Bianca', type: 'canotte', base_price: 25, image_url: 'https://via.placeholder.com/400x500/0f172a/ec4899?text=CANOTTA+FSW' },
-    { id: 's3', name: 'Canotta All-Star Firmata MVP', type: 'limited', base_price: 15, image_url: 'https://via.placeholder.com/400x500/0f172a/f97316?text=LIMITED+EDITION' }
+    { id: 's1', name: 'Canotta FSW Nera', type: 'canotte', base_price: 25, image_url: '/shop/Nera.png' },
+    { id: 's2', name: 'Canotta FSW Bianca', type: 'canotte', base_price: 25, image_url: '/shop/Bianca.png' },
+    { id: 's3', name: 'Canotta Iverson - Limited', type: 'limited', base_price: 15, image_url: '/shop/Iverson.png' },
+    { id: 's4', name: 'Canotta Rodman - Limited', type: 'limited', base_price: 15, image_url: '/shop/Rodman.png' },
+    { id: 's5', name: 'Canotta Curry - Limited', type: 'limited', base_price: 15, image_url: '/shop/Curry.png' }
   ];
 
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
     
-    // Fetch Shop Data: gestiamo l'errore tramite l'oggetto destrutturato, niente .catch()
+    // Fetch Shop Data
     const { data: shopData, error: shopError } = await supabase.from('shop_items').select('*');
     
     // Solo Admin vede le offerte
@@ -88,7 +95,6 @@ export default function Home() {
     if (teamsData) setTeams(teamsData);
     if (gamesData) setGames(gamesData);
     
-    // Se non c'è errore e ci sono dati, mettili nello state, altrimenti usa i dummy (fallback)
     if (!shopError && shopData && shopData.length > 0) {
       setShopItems(shopData);
     } else {
@@ -412,32 +418,58 @@ export default function Home() {
     setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
-  // --- SHOP LOGIC ---
+  // --- FUNZIONI CAROSELLO IMMAGINI ---
+  const nextImage = (e: React.MouseEvent, itemId: string | number, max: number) => {
+    e.stopPropagation();
+    setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) + 1) % max}));
+  };
+
+  const prevImage = (e: React.MouseEvent, itemId: string | number, max: number) => {
+    e.stopPropagation();
+    setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max}));
+  };
+
+  // --- SHOP LOGIC CON GESTIONE ERRORI IN-MODAL ---
   const submitBid = async () => {
+    setBidError(null); 
+
     if (!bidForm.name || !bidForm.contact || !bidForm.amount) {
-      showAlert("Dati mancanti", "Compila tutti i campi per fare l'offerta.");
+      setBidError("Compila tutti i campi per fare l'offerta.");
       return;
     }
+    
     const amountNum = parseFloat(bidForm.amount.replace(',', '.'));
+    
     if (isNaN(amountNum) || amountNum < selectedBidItem.base_price) {
-      showAlert("Offerta non valida", `L'offerta deve essere un numero valido e maggiore o uguale a €${selectedBidItem.base_price}`);
+      setBidError(`L'offerta deve essere maggiore o uguale a €${selectedBidItem.base_price}`);
       return;
     }
 
+    if (typeof selectedBidItem.id === 'string') {
+      setBidError("Articolo di prova. Sostituisci i dati fittizi col DB per testare.");
+      return;
+    }
+
+    setIsSubmittingBid(true);
+
     const { error } = await supabase.from('bids').insert({
       item_id: selectedBidItem.id,
-      bidder_name: bidForm.name,
+      bidder_name: bidForm.name.toUpperCase(),
       contact_info: bidForm.contact,
       amount: amountNum
     });
 
+    setIsSubmittingBid(false);
+
     if (error) {
       console.error(error);
-      showAlert("Errore", "Si è verificato un problema nell'inviare l'offerta.");
+      setBidError("Errore di connessione. Riprova tra poco.");
     } else {
       setIsBidModalOpen(false);
       setBidForm({ name: '', contact: '', amount: '' });
+      setBidError(null);
       showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata. Se sarai il vincitore verrai contattato a fine asta!");
+      fetchData(); // Aggiorna per l'admin
     }
   };
 
@@ -446,8 +478,6 @@ export default function Home() {
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
   const nextGames = sortedGames.filter(g => g.status === 'programmata').slice(0, 2);
   const activeLiveGamesCount = games.filter(g => g.status === 'in_corso').length;
-
-  const navItemClass = isAdminUnlocked ? "flex-1" : "flex-1"; // Adattato per ospitare 5 icone
 
   const renderTeamName = (team: any, bracketCode: string, isHome: boolean) => {
     if (team && team.name) return team.name;
@@ -458,8 +488,8 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-24 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* LOGO */}
-        {(activeTab === 'home' || activeTab === 'shop') && (
+        {/* LOGO: VISIBILE SOLO NELLA HOME ORA */}
+        {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
             <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
           </div>
@@ -549,32 +579,55 @@ export default function Home() {
               {shopItems.filter(i => i.type === activeShopTab).length === 0 ? (
                 <div className="col-span-full p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun articolo al momento.</div>
               ) : (
-                shopItems.filter(i => i.type === activeShopTab).map((item) => (
-                  <div key={item.id} className={`bg-slate-900 rounded-2xl overflow-hidden border-2 shadow-xl flex flex-col ${item.type === 'limited' ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(236,72,153,1)]' : 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]'}`}>
-                    <div className="aspect-[4/5] bg-slate-800 relative">
-                      <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                      {item.type === 'limited' && (
-                        <div className="absolute top-2 right-2 bg-pink-600 text-white text-[9px] font-black uppercase px-2 py-1 rounded shadow-md animate-pulse">Asta al Buio</div>
-                      )}
-                    </div>
-                    <div className="p-4 flex flex-col flex-1 justify-between">
-                      <div>
-                        <h3 className="font-black uppercase text-white leading-tight mb-1 text-sm">{item.name}</h3>
-                        {item.type === 'limited' ? (
-                          <p className="text-pink-400 font-black text-xs italic tracking-widest mb-3">Prezzo base: €{item.base_price}</p>
-                        ) : (
-                          <p className="text-cyan-400 font-black text-sm mb-3">€{item.base_price}</p>
+                shopItems.filter(i => i.type === activeShopTab).map((item) => {
+                  // --- LOGICA CAROSELLO FOTO (Corretta TS implicity any) ---
+                  const images = item.image_url ? item.image_url.split(',').map((u: string) => u.trim()) : [];
+                  const imgIdx = currentImageIndexes[item.id] || 0;
+                  const currentImage = images[imgIdx] || 'https://via.placeholder.com/400x500/0f172a/06b6d4?text=FOTO+NON+DISPONIBILE';
+
+                  return (
+                    <div key={item.id} className={`bg-slate-900 rounded-2xl overflow-hidden border-2 shadow-xl flex flex-col ${item.type === 'limited' ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(236,72,153,1)]' : 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]'}`}>
+                      
+                      <div className="aspect-[4/5] bg-slate-800 relative group">
+                        <img src={currentImage} alt={`${item.name} - Foto ${imgIdx + 1}`} className="w-full h-full object-cover transition-opacity duration-300" />
+                        
+                        {item.type === 'limited' && (
+                          <div className="absolute top-2 right-2 bg-pink-600 text-white text-[9px] font-black uppercase px-2 py-1 rounded shadow-md animate-pulse z-10">Asta al Buio</div>
+                        )}
+
+                        {/* CONTROLLI CAROSELLO */}
+                        {images.length > 1 && (
+                          <>
+                            <button onClick={(e) => prevImage(e, item.id, images.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm opacity-80 hover:opacity-100 transition-opacity active:scale-95">{'<'}</button>
+                            <button onClick={(e) => nextImage(e, item.id, images.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm opacity-80 hover:opacity-100 transition-opacity active:scale-95">{'>'}</button>
+                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/50 px-2 py-1 rounded-full">
+                              {images.map((_: string, idx: number) => (
+                                <div key={idx} className={`w-2 h-2 rounded-full transition-colors ${idx === imgIdx ? 'bg-pink-500' : 'bg-white/50'}`} />
+                              ))}
+                            </div>
+                          </>
                         )}
                       </div>
-                      
-                      {item.type === 'limited' ? (
-                        <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">Fai un'offerta 🤫</button>
-                      ) : (
-                        <button className="w-full bg-slate-800 text-slate-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest cursor-not-allowed mt-auto">Acquista al banco</button>
-                      )}
+
+                      <div className="p-4 flex flex-col flex-1 justify-between">
+                        <div>
+                          <h3 className="font-black uppercase text-white leading-tight mb-1 text-sm">{item.name}</h3>
+                          {item.type === 'limited' ? (
+                            <p className="text-pink-400 font-black text-xs italic tracking-widest mb-3">Prezzo base: €{item.base_price}</p>
+                          ) : (
+                            <p className="text-cyan-400 font-black text-sm mb-3">€{item.base_price}</p>
+                          )}
+                        </div>
+                        
+                        {item.type === 'limited' ? (
+                          <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto">Fai un'offerta 🤫</button>
+                        ) : (
+                          <button className="w-full bg-slate-800 text-slate-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest cursor-not-allowed mt-auto">Acquista al banco</button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </section>
@@ -761,11 +814,10 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('orari')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
               <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
-              {/* NUOVO TAB ADMIN ASTE */}
               <button onClick={() => setActiveAdminSubTab('aste')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'aste' ? 'bg-purple-500 text-white shadow-md' : 'text-slate-500'}`}>🎁 Aste</button>
             </div>
 
-            {/* LIVE CONTROL (ORDINATO E FILTRATO) */}
+            {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
               <div className="space-y-4 pb-20">
                 
@@ -862,7 +914,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* ORARI ADMIN DIVISO IN DUE TAB CON EVENTI SUPPORTATI */}
+            {/* ORARI ADMIN */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4 pb-20">
                 <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Voce Calendario</button>
@@ -1030,7 +1082,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Aggiornato con SHOP) --- */}
+      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-around items-center max-w-xl mx-auto p-2">
           <button onClick={() => setActiveTab('home')} className={`flex-1 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
@@ -1200,13 +1252,20 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE FAI OFFERTA (NUOVO) --- */}
+      {/* --- MODALE FAI OFFERTA --- */}
       {isBidModalOpen && selectedBidItem && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
             <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
             <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
             
+            {/* MESSAGGIO DI ERRORE IN-MODAL */}
+            {bidError && (
+              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
+                {bidError}
+              </div>
+            )}
+
             <div className="space-y-4 mb-8">
               <div>
                 <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest block mb-1">Nome e Cognome</label>
@@ -1227,8 +1286,14 @@ export default function Home() {
             </div>
             
             <div className="flex flex-col gap-3">
-              <button onClick={submitBid} className="bg-pink-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full active:scale-95 transition-transform">Invia Busta Chiusa 🤫</button>
-              <button onClick={() => { setIsBidModalOpen(false); setBidForm({name: '', contact: '', amount: ''}); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
+              <button 
+                onClick={submitBid} 
+                disabled={isSubmittingBid}
+                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
+              >
+                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
+              </button>
+              <button onClick={() => { setIsBidModalOpen(false); setBidForm({name: '', contact: '', amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
             </div>
           </div>
         </div>
