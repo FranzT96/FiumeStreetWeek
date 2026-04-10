@@ -43,7 +43,11 @@ export default function Home() {
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
+  
+  // FIX: Memoria di ferro per il recupero password
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+  const isRecoveryRef = useRef(false);
+  
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
   const [email, setEmail] = useState('');
@@ -116,29 +120,40 @@ export default function Home() {
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+    // 1. Controllo Immediato dell'URL (prima che Supabase lo pulisca)
+    if (typeof window !== 'undefined' && window.location.href.includes('type=recovery')) {
+      isRecoveryRef.current = true;
       setIsRecoveringPassword(true);
       setAuthChecking(false);
     }
 
     checkSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    // 2. Ascoltatore Eventi Auth
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
+        // L'utente ha cliccato il link
+        isRecoveryRef.current = true;
         setIsRecoveringPassword(true);
         setAuthChecking(false);
       } else if (event === 'SIGNED_IN') {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
-        if (!window.location.hash.includes('type=recovery')) {
+        
+        // Se NON stiamo facendo un recupero, navighiamo nell'app
+        if (!isRecoveryRef.current) {
           setIsRecoveringPassword(false);
           fetchData();
           setActiveTab('home');
+        } else {
+          // Se siamo in recupero, sblocca il caricamento ma mostra la modale di password
+          setAuthChecking(false);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAdminUnlocked(false);
         setIsRecoveringPassword(false);
+        isRecoveryRef.current = false;
       }
     });
 
@@ -162,7 +177,7 @@ export default function Home() {
   // --- LOGICA AGGIORNAMENTO PASSWORD DA LINK ---
   const handleUpdatePassword = async () => {
     if (!password) {
-      showAlert("Dati mancanti", "Inserisci la nuova password.");
+      showAlert("Attenzione", "Inserisci la nuova password.");
       return;
     }
     
@@ -173,9 +188,10 @@ export default function Home() {
     if (error) {
       showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
     } else {
+      isRecoveryRef.current = false;
       setIsRecoveringPassword(false);
       setPassword('');
-      window.location.hash = "";
+      window.location.hash = ""; // Pulizia profonda
       showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato.");
       fetchData();
       setActiveTab('home');
