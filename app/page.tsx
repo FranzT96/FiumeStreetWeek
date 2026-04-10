@@ -4,12 +4,12 @@ import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase';
 
 export default function Home() {
-  // --- CONFIGURAZIONE ADMIN ---
-  const ADMIN_EMAIL = 'admin@fsw.it';
+  // --- CONFIGURAZIONE ADMIN AGGIORNATA ---
+  const ADMIN_EMAIL = 'fiumestreetweek@gmail.com';
 
   const [loading, setLoading] = useState(true);
   const [authChecking, setAuthChecking] = useState(true);
-  const [isAuthLoading, setIsAuthLoading] = useState(false); // <-- NUOVO STATO PER FIXARE IL BOTTONE
+  const [isAuthLoading, setIsAuthLoading] = useState(false); 
   
   const [teams, setTeams] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
@@ -47,9 +47,10 @@ export default function Home() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
-  // Auth Form Fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
 
@@ -74,7 +75,6 @@ export default function Home() {
     { id: 's5', name: 'Canotta Curry - Limited', type: 'limited', base_price: 15, image_url: '/shop/Curry.png' }
   ];
 
-  // --- ESTRATTORE NOME DA EMAIL ---
   const extractNameFromEmail = (userEmail: string) => {
     if (!userEmail) return 'Anonimo';
     const namePart = userEmail.split('@')[0];
@@ -148,23 +148,51 @@ export default function Home() {
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH (Fixata per usare isAuthLoading) ---
+  // --- LOGICA AUTH CON UX MIGLIORATA E AVVISI ---
   const handleAuthAction = async () => {
     if (!email || !password) {
       showAlert("Dati mancanti", "Inserisci email e password.");
       return;
     }
     
-    setIsAuthLoading(true); // <-- Usa il nuovo stato!
+    setIsAuthLoading(true);
     
     if (authMode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) showAlert("Errore Login", "Credenziali non valide. Controlla e riprova."); 
+      if (error) {
+        showAlert("Errore Login", "Credenziali non valide. Controlla e riprova."); 
+      } else {
+        setEmail(''); setPassword('');
+        // Il listener onAuthStateChange gestirà il redirect in background
+      }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) showAlert("Errore", error.message);
+      // Registrazione
+      if (!regName || !regPhone) {
+        showAlert("Dati mancanti", "Inserisci il tuo Nome e il tuo Contatto per registrarti.");
+        setIsAuthLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            full_name: regName,
+            phone: regPhone
+          }
+        }
+      });
+
+      if (error) {
+        showAlert("Errore Registrazione", error.message);
+      } else {
+        // Successo Registrazione! Puliamo i campi e diamo il benvenuto
+        setEmail(''); setPassword(''); setRegName(''); setRegPhone('');
+        showAlert("Benvenuto! 🎉", "Registrazione avvenuta con successo. Sei stato collegato automaticamente, ora puoi consultare il torneo e fare offerte!");
+      }
     }
-    setIsAuthLoading(false); // <-- Sblocca il pulsante
+    setIsAuthLoading(false);
   };
 
   const promptLogout = () => {
@@ -175,7 +203,7 @@ export default function Home() {
       type: 'confirm',
       onConfirm: async () => {
         await supabase.auth.signOut();
-        setEmail(''); setPassword('');
+        setEmail(''); setPassword(''); setRegName(''); setRegPhone('');
         closeModal();
       }
     });
@@ -452,7 +480,8 @@ export default function Home() {
     }
 
     const userEmail = user?.email || '';
-    const userName = extractNameFromEmail(userEmail);
+    const userName = user?.user_metadata?.full_name || extractNameFromEmail(userEmail);
+    const userPhone = user?.user_metadata?.phone || 'Nessun contatto registrato';
     const newTimestamp = new Date().toISOString();
 
     setIsSubmittingBid(true);
@@ -473,7 +502,7 @@ export default function Home() {
       const { error: insertError } = await supabase.from('bids').insert({
         item_id: selectedBidItem.id,
         bidder_name: userName,
-        contact_info: userEmail,
+        contact_info: userEmail, // Manteniamo la mail come ID univoco per le offerte
         amount: amountNum,
         created_at: newTimestamp
       });
@@ -494,10 +523,10 @@ export default function Home() {
     }
   };
 
-  // Se l'auth è in fase di caricamento
+  // Se l'auth è in fase di caricamento invisibile all'avvio
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
-  // Schermata Muro per il Login
+  // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE ---
   if (!user) {
     return (
       <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
@@ -517,6 +546,21 @@ export default function Home() {
               <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             </div>
             <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+            
+            {/* Campi Extra solo se Registrazione */}
+            {authMode === 'register' && (
+              <div className="space-y-4 pt-4 border-t border-slate-800 mt-4">
+                <div>
+                  <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Nome e Cognome</label>
+                  <input type="text" placeholder="Mario Rossi" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 uppercase font-black" />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Contatto (Ig o Cellulare)</label>
+                  <input type="text" placeholder="@mariorossi / 333..." value={regPhone} onChange={(e) => setRegPhone(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 font-mono" />
+                </div>
+              </div>
+            )}
+
           </div>
 
           <button onClick={handleAuthAction} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' ? 'bg-cyan-500 text-slate-900 active:scale-95' : 'bg-pink-500 text-white active:scale-95'}`}>
@@ -538,7 +582,7 @@ export default function Home() {
     );
   }
 
-  // App Principale Loggata
+  // --- APP PRINCIPALE LOGGATA ---
   if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione Dati...</div>;
 
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
@@ -863,9 +907,6 @@ export default function Home() {
                       <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
-                      <button onClick={promptLogout} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
-                        <span className="text-sm">🚪</span> Logout Admin
-                      </button>
                     </div>
                   </>
                 )}
@@ -1147,7 +1188,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
+      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth Invariata) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-4 border-cyan-500 z-50">
         <div className="flex justify-between items-center max-w-xl mx-auto p-1 sm:p-2">
           <button onClick={() => setActiveTab('home')} className={`w-1/6 flex flex-col items-center ${activeTab === 'home' ? 'text-pink-500' : 'text-slate-500'}`}>
@@ -1302,6 +1343,60 @@ export default function Home() {
               <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
               <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA (Blindata) --- */}
+      {isBidModalOpen && selectedBidItem && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
+            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
+            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
+            
+            {bidError && (
+              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
+                {bidError}
+              </div>
+            )}
+
+            <div className="space-y-4 mb-8">
+              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
+                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Stai offrendo come:</p>
+                <p className="text-sm text-slate-300 font-black uppercase">{user?.user_metadata?.full_name || extractNameFromEmail(user?.email)}</p>
+                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user?.email}</p>
+              </div>
+
+              <div>
+                <label className="text-[9px] font-black uppercase text-pink-500 tracking-widest block mb-1">La tua offerta (€)</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
+                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-pink-900 text-xl outline-none focus:border-pink-500 font-black transition-colors" />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={submitBid} 
+                disabled={isSubmittingBid}
+                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
+              >
+                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
+              </button>
+              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE ALERTS (Per l'app principale) --- */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
+            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+            <div className="flex justify-end gap-3">{modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>}<button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button></div>
           </div>
         </div>
       )}
