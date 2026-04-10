@@ -147,7 +147,7 @@ export default function Home() {
   const closeModal = () => setModal({ ...modal, isOpen: false });
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH COMPLETA (Login, Register, Reset Password Sicuro) ---
+  // --- LOGICA AUTH COMPLETA ---
   const handleAuthAction = async () => {
     setIsAuthLoading(true);
 
@@ -223,10 +223,12 @@ export default function Home() {
       title: "Logout",
       message: "Sei sicuro di voler uscire dal tuo account?",
       type: 'confirm',
-      onConfirm: async () => {
-        await supabase.auth.signOut();
-        setEmail(''); setPassword(''); setRegName('');
-        closeModal();
+      onConfirm: () => {
+        closeModal(); // Chiude prima la modale per evitare glitch visivi
+        supabase.auth.signOut().then(() => {
+          setEmail(''); setPassword(''); setRegName('');
+          setActiveTab('home');
+        });
       }
     });
   };
@@ -944,7 +946,7 @@ export default function Home() {
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
                       <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors">
-                        <span className="text-sm">🚪</span> Logout Admin
+                        <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
                   </>
@@ -1227,7 +1229,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
+      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
         <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -1255,6 +1257,7 @@ export default function Home() {
             <span className="text-[7px] sm:text-[9px] font-black uppercase italic truncate w-full text-center mt-1">Shop</span>
           </button>
           
+          {/* ICONA DINAMICA: ADMIN / LOGOUT */}
           {isAdminUnlocked ? (
             <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
               <span className={`text-xl transition-all duration-200 ${activeTab === 'admin' ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'scale-100'}`}>⚙️</span>
