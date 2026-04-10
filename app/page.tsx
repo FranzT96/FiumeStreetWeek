@@ -216,25 +216,40 @@ export default function Home() {
     setIsAuthLoading(false);
   };
 
+  const performLogout = async () => {
+    closeModal();
+    await supabase.auth.signOut();
+    setUser(null);
+    setIsAdminUnlocked(false);
+    setEmail(''); setPassword(''); setRegName('');
+    setActiveTab('home');
+  };
+
   const promptLogout = () => {
     setModal({
       isOpen: true,
       title: "Logout",
       message: "Sei sicuro di voler uscire dal tuo account?",
       type: 'confirm',
-      onConfirm: async () => {
-        closeModal();
-        await supabase.auth.signOut();
-        setUser(null);
-        setIsAdminUnlocked(false);
-        setEmail(''); setPassword(''); setRegName('');
-        setActiveTab('home');
-      }
+      onConfirm: performLogout
     });
   };
 
   const resetTournament = () => {
-    setModal({ isOpen: true, title: "⚠️ ATTENZIONE", message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.", type: 'confirm', onConfirm: async () => { closeModal(); setLoading(true); await supabase.from('games').delete().neq('stage', 'girone'); await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); await fetchData(); } });
+    setModal({ 
+      isOpen: true, 
+      title: "⚠️ ATTENZIONE", 
+      message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.", 
+      type: 'confirm', 
+      onConfirm: async () => { 
+        closeModal(); 
+        setLoading(true); 
+        await supabase.from('games').delete().neq('stage', 'girone'); 
+        await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); 
+        await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); 
+        await fetchData(); 
+      } 
+    });
   };
 
   const getStageWeight = (stage: string) => {
@@ -546,6 +561,7 @@ export default function Home() {
     }
   };
 
+  // Se l'auth è in fase di caricamento invisibile all'avvio
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
   // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET ---
@@ -612,7 +628,12 @@ export default function Home() {
             <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
               <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
               <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-              <div className="flex justify-end gap-3"><button onClick={closeModal} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Ok</button></div>
+              <div className="flex justify-end gap-3">
+                {modal.type === 'confirm' && (
+                  <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
+                )}
+                <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Conferma</button>
+              </div>
             </div>
           </div>
         )}
@@ -1229,7 +1250,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
+      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
         <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -1430,6 +1451,22 @@ export default function Home() {
                 {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
               </button>
               <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE ALERTS (Per l'app principale, con z-index altissimo) --- */}
+      {modal.isOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
+            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+            <div className="flex justify-end gap-3">
+              {modal.type === 'confirm' && (
+                <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
+              )}
+              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button>
             </div>
           </div>
         </div>
