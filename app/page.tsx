@@ -626,7 +626,7 @@ export default function Home() {
               <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             )}
             
-            {/* Input OTP (Limiti aggiornati per supportare token da 8 cifre e spaziatura sistemata) */}
+            {/* Input OTP a 8 caratteri */}
             {authMode === 'reset_verify' && (
               <input type="text" placeholder="ES. 12345678" maxLength={8} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-center text-xl tracking-widest outline-none focus:border-cyan-500 font-mono transition-colors uppercase" />
             )}
@@ -1013,6 +1013,9 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
+                        <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
                   </>
