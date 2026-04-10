@@ -144,7 +144,7 @@ export default function Home() {
     if (user) fetchData();
   }, [user]);
 
-  const closeModal = () => setModal({ ...modal, isOpen: false });
+  const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
   const handleAuthAction = async () => {
@@ -942,10 +942,10 @@ export default function Home() {
                   <>
                     <div className="fixed inset-0 cursor-default" onClick={() => setIsAdminMenuOpen(false)}></div>
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
-                      <button onClick={() => { setIsAdminMenuOpen(false); resetTournament(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
-                      <button onClick={() => { setIsAdminMenuOpen(false); promptLogout(); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
@@ -1229,7 +1229,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (Icone con Logica Auth) --- */}
+      {/* --- MENU BASSO DINAMICO --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-50 pb-safe">
         <div className="flex justify-evenly items-end max-w-xl mx-auto px-1 py-2">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center w-[16%] transition-all duration-200 ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-500 hover:text-slate-300'}`}>
