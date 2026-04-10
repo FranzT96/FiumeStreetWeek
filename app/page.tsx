@@ -44,7 +44,7 @@ export default function Home() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
   
-  // FIX: Memoria di ferro per il recupero password
+  // Memoria di ferro per la gestione del recupero password (risolve i crash di sessione)
   const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   const isRecoveryRef = useRef(false);
   
@@ -120,40 +120,53 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // 1. Controllo Immediato dell'URL (prima che Supabase lo pulisca)
-    // Catturiamo sia il vecchio "type=recovery" che il nostro nuovo custom "action=reset_password"
+    checkSession();
+    
+    let recoveryTimeout: NodeJS.Timeout;
+
+    // GESTIONE INTELLIGENTE DEL RECUPERO PASSWORD
     if (typeof window !== 'undefined') {
-      const currentUrl = window.location.href;
-      if (currentUrl.includes('type=recovery') || currentUrl.includes('action=reset_password')) {
-        isRecoveryRef.current = true;
-        setIsRecoveringPassword(true);
-        setAuthChecking(false);
+      const urlStr = window.location.href;
+      
+      // Rileviamo se l'utente arriva da un link di reset
+      if (urlStr.includes('code=') || urlStr.includes('type=recovery')) {
+        
+        // Impostiamo un timer "cane da guardia". 
+        // Se Supabase non lancia l'evento di successo entro 2.5 secondi, significa che il browser in-app (Outlook/IG) ha rotto la connessione di sicurezza.
+        recoveryTimeout = setTimeout(() => {
+          if (!isRecoveryRef.current) {
+            showAlert("⚠️ Browser Incompatibile", "Stai aprendo l'app da un browser interno (es. Outlook o Gmail) che blocca il ripristino per sicurezza. Tieni premuto il link nella mail, fai 'Copia' e incollalo direttamente su Safari o Chrome.");
+            setAuthChecking(false);
+          }
+        }, 2500);
       }
     }
 
-    checkSession();
-
-    // 2. Ascoltatore Eventi Auth
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      
       if (event === 'PASSWORD_RECOVERY') {
+        // Supabase ha processato il token con successo!
+        clearTimeout(recoveryTimeout); // Spegniamo il cane da guardia
         isRecoveryRef.current = true;
         setIsRecoveringPassword(true);
         setAuthChecking(false);
-      } else if (event === 'SIGNED_IN') {
+      } 
+      else if (event === 'SIGNED_IN') {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
         
-        // Se NON stiamo facendo un recupero, navighiamo normalmente nell'app
-        if (!isRecoveryRef.current) {
+        if (isRecoveryRef.current) {
+          // Mantieni aperta la modale di reset
+          setIsRecoveringPassword(true);
+          setAuthChecking(false);
+        } else {
+          // Accesso normale
           setIsRecoveringPassword(false);
           fetchData();
           setActiveTab('home');
-        } else {
-          // Se siamo in recupero, sblocca il caricamento ma forzalo a restare sulla modale password
-          setIsRecoveringPassword(true);
-          setAuthChecking(false);
         }
-      } else if (event === 'SIGNED_OUT') {
+      } 
+      else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAdminUnlocked(false);
         setIsRecoveringPassword(false);
@@ -166,6 +179,7 @@ export default function Home() {
     const channelPlayers = supabase.channel('realtime-players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => { fetchData(); }).subscribe();
     
     return () => { 
+      if (recoveryTimeout) clearTimeout(recoveryTimeout);
       supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); 
       authListener.subscription.unsubscribe();
     };
@@ -186,22 +200,25 @@ export default function Home() {
     }
     
     setIsAuthLoading(true);
+    
+    // Essendo entrati tramite PASSWORD_RECOVERY, la sessione è autenticata in background
     const { error } = await supabase.auth.updateUser({ password });
     setIsAuthLoading(false);
 
     if (error) {
       showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
     } else {
+      // Pulizia totale
       isRecoveryRef.current = false;
       setIsRecoveringPassword(false);
       setPassword('');
       
-      // Pulizia profonda dell'URL per non ricascare nel reset al prossimo refresh
+      // Puliamo l'URL dai residui di token per evitare loop strani ai successivi reload
       if (typeof window !== 'undefined') {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
       
-      showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato.");
+      showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato e pronto.");
       fetchData();
       setActiveTab('home');
     }
@@ -217,11 +234,8 @@ export default function Home() {
         return;
       }
       
-      // IL TRUCCO: Aggiungiamo "?action=reset_password" all'URL in modo da intercettarlo sempre
-      const resetUrl = `${window.location.origin}?action=reset_password`;
-      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: resetUrl,
+        redirectTo: window.location.origin,
       });
 
       if (error) {
@@ -1052,6 +1066,9 @@ export default function Home() {
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
+                        <span className="text-sm">🚪</span> Logout
+                      </button>
                     </div>
                   </>
                 )}
@@ -1370,7 +1387,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- MODALE ALERTS E CONFERME --- */}
+      {/* --- MODALE ALERTS / CONFERME (Z-INDEX 300) --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
