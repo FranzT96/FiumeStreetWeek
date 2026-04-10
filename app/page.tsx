@@ -45,6 +45,7 @@ export default function Home() {
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset'>('login');
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false); // <--- NUOVO STATO RECUPERO
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
   const [email, setEmail] = useState('');
@@ -122,11 +123,16 @@ export default function Home() {
   useEffect(() => {
     checkSession();
 
+    // --- INTERCETTATORE EVENTI AUTH (Incluso il recupero password) ---
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      checkSession();
-      if (event === 'SIGNED_IN') {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveringPassword(true);
+      } else if (event === 'SIGNED_IN') {
+        checkSession();
         fetchData();
         setActiveTab('home');
+      } else {
+        checkSession();
       }
     });
 
@@ -141,11 +147,33 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (user) fetchData();
-  }, [user]);
+    if (user && !isRecoveringPassword) fetchData();
+  }, [user, isRecoveringPassword]);
 
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
+
+  // --- LOGICA CAMBIO PASSWORD DA LINK ---
+  const handleUpdatePassword = async () => {
+    if (!password) {
+      showAlert("Dati mancanti", "Inserisci la nuova password.");
+      return;
+    }
+    
+    setIsAuthLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setIsAuthLoading(false);
+
+    if (error) {
+      showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
+    } else {
+      setPassword('');
+      setIsRecoveringPassword(false);
+      showAlert("Fatto! 🚀", "La tua password è stata aggiornata con successo.");
+      fetchData();
+      setActiveTab('home');
+    }
+  };
 
   const handleAuthAction = async () => {
     setIsAuthLoading(true);
@@ -216,40 +244,25 @@ export default function Home() {
     setIsAuthLoading(false);
   };
 
-  const performLogout = async () => {
-    closeModal();
-    await supabase.auth.signOut();
-    setUser(null);
-    setIsAdminUnlocked(false);
-    setEmail(''); setPassword(''); setRegName('');
-    setActiveTab('home');
-  };
-
   const promptLogout = () => {
     setModal({
       isOpen: true,
       title: "Logout",
       message: "Sei sicuro di voler uscire dal tuo account?",
       type: 'confirm',
-      onConfirm: performLogout
+      onConfirm: async () => {
+        closeModal();
+        await supabase.auth.signOut();
+        setUser(null);
+        setIsAdminUnlocked(false);
+        setEmail(''); setPassword(''); setRegName('');
+        setActiveTab('home');
+      }
     });
   };
 
   const resetTournament = () => {
-    setModal({ 
-      isOpen: true, 
-      title: "⚠️ ATTENZIONE", 
-      message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.", 
-      type: 'confirm', 
-      onConfirm: async () => { 
-        closeModal(); 
-        setLoading(true); 
-        await supabase.from('games').delete().neq('stage', 'girone'); 
-        await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); 
-        await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); 
-        await fetchData(); 
-      } 
-    });
+    setModal({ isOpen: true, title: "⚠️ ATTENZIONE", message: "Sei sicuro? Verranno azzerati i punteggi delle partite a gironi, le classifiche, e VERRANNO ELIMINATI i Playoff generati. I roster e il calendario iniziale rimarranno intatti.", type: 'confirm', onConfirm: async () => { closeModal(); setLoading(true); await supabase.from('games').delete().neq('stage', 'girone'); await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); await fetchData(); } });
   };
 
   const getStageWeight = (stage: string) => {
@@ -561,8 +574,32 @@ export default function Home() {
     }
   };
 
-  // Se l'auth è in fase di caricamento invisibile all'avvio
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
+
+  // --- SCHERMATA AGGIORNAMENTO PASSWORD (via link email) ---
+  if (isRecoveringPassword) {
+    return (
+      <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
+        <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] animate-fade-in relative overflow-hidden">
+          <h3 className="text-2xl font-black uppercase mb-2 text-center text-white italic tracking-widest">Nuova Password</h3>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center mb-6">Inserisci la tua nuova password per l'account.</p>
+          <input type="password" placeholder="Nuova Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors mb-6" />
+          <button onClick={handleUpdatePassword} disabled={isAuthLoading} className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}>
+            {isAuthLoading ? 'Salvataggio...' : 'Salva e Accedi'}
+          </button>
+        </div>
+        {modal.isOpen && (
+          <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
+              <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
+              <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+              <div className="flex justify-end gap-3"><button onClick={closeModal} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Ok</button></div>
+            </div>
+          </div>
+        )}
+      </main>
+    );
+  }
 
   // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET ---
   if (!user) {
@@ -628,12 +665,7 @@ export default function Home() {
             <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
               <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
               <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-              <div className="flex justify-end gap-3">
-                {modal.type === 'confirm' && (
-                  <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
-                )}
-                <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Conferma</button>
-              </div>
+              <div className="flex justify-end gap-3"><button onClick={closeModal} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Ok</button></div>
             </div>
           </div>
         )}
@@ -965,9 +997,6 @@ export default function Home() {
                     <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
-                        <span className="text-sm">🚪</span> Logout
                       </button>
                     </div>
                   </>
@@ -1451,22 +1480,6 @@ export default function Home() {
                 {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
               </button>
               <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE ALERTS (Per l'app principale, con z-index altissimo) --- */}
-      {modal.isOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest font-black">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-            <div className="flex justify-end gap-3">
-              {modal.type === 'confirm' && (
-                <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
-              )}
-              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest font-black active:scale-95 transition-transform">Conferma</button>
             </div>
           </div>
         </div>
