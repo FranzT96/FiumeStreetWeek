@@ -49,7 +49,7 @@ export default function Home() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [regName, setRegName] = useState('');
-  const [otpCode, setOtpCode] = useState(''); // Stato per il codice a 6 cifre
+  const [otpCode, setOtpCode] = useState(''); 
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
 
@@ -166,7 +166,7 @@ export default function Home() {
         showAlert("Errore", "Impossibile inviare il codice. Controlla l'email.");
       } else {
         setAuthMode('reset_verify'); // Passiamo alla fase di verifica codice
-        showAlert("Codice Inviato!", "Controlla la tua casella di posta per il codice a 6 cifre.");
+        showAlert("Codice Inviato!", "Controlla la tua casella di posta per il codice segreto.");
       }
       setIsAuthLoading(false);
       return;
@@ -614,7 +614,7 @@ export default function Home() {
           {authMode === 'reset_verify' && (
             <div className="mb-6 text-center">
               <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2">Inserisci Codice</h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Abbiamo inviato un codice a 6 cifre alla tua email.</p>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Abbiamo inviato il codice alla tua email.</p>
             </div>
           )}
 
@@ -626,9 +626,9 @@ export default function Home() {
               <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
             )}
             
-            {/* Input OTP a 6 cifre */}
+            {/* Input OTP (Limiti aggiornati per supportare token da 8 cifre e spaziatura sistemata) */}
             {authMode === 'reset_verify' && (
-              <input type="text" placeholder="Codice a 6 cifre" maxLength={6} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-center text-2xl tracking-[0.5em] outline-none focus:border-cyan-500 font-mono transition-colors uppercase" />
+              <input type="text" placeholder="ES. 12345678" maxLength={8} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-center text-xl tracking-widest outline-none focus:border-cyan-500 font-mono transition-colors uppercase" />
             )}
 
             {/* Campo Password: Usato nel login, register e nel reset_verify (per la nuova) */}
