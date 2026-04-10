@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/utils/supabase';
 
 export default function Home() {
-  // --- CONFIGURAZIONE ADMIN AGGIORNATA ---
+  // --- CONFIGURAZIONE ADMIN ---
   const ADMIN_EMAIL = 'fiumestreetweek@gmail.com';
 
   const [loading, setLoading] = useState(true);
@@ -13,8 +13,6 @@ export default function Home() {
   
   const [teams, setTeams] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
-  
-  // --- SHOP STATE ---
   const [shopItems, setShopItems] = useState<any[]>([]);
   const [bids, setBids] = useState<any[]>([]);
   
@@ -97,14 +95,11 @@ export default function Home() {
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
-    
     const { data: shopData, error: shopError } = await supabase.from('shop_items').select('*');
     
     const { data: { session } } = await supabase.auth.getSession();
     if (session && session.user.email === ADMIN_EMAIL) {
-      const { data: bidsData } = await supabase.from('bids').select('*')
-        .order('amount', { ascending: false })
-        .order('created_at', { ascending: true }); 
+      const { data: bidsData } = await supabase.from('bids').select('*').order('amount', { ascending: false }).order('created_at', { ascending: true }); 
       if (bidsData) setBids(bidsData);
     }
 
@@ -121,17 +116,29 @@ export default function Home() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      setIsRecoveringPassword(true);
+      setAuthChecking(false);
+    }
+
     checkSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecoveringPassword(true);
+        setAuthChecking(false);
       } else if (event === 'SIGNED_IN') {
-        checkSession();
-        fetchData();
-        setActiveTab('home');
-      } else {
-        checkSession();
+        setUser(session?.user || null);
+        setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
+        if (!window.location.hash.includes('type=recovery')) {
+          setIsRecoveringPassword(false);
+          fetchData();
+          setActiveTab('home');
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setIsAdminUnlocked(false);
+        setIsRecoveringPassword(false);
       }
     });
 
@@ -152,6 +159,7 @@ export default function Home() {
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
+  // --- LOGICA AGGIORNAMENTO PASSWORD DA LINK ---
   const handleUpdatePassword = async () => {
     if (!password) {
       showAlert("Dati mancanti", "Inserisci la nuova password.");
@@ -165,9 +173,10 @@ export default function Home() {
     if (error) {
       showAlert("Errore", "Impossibile aggiornare la password: " + error.message);
     } else {
-      setPassword('');
       setIsRecoveringPassword(false);
-      showAlert("Fatto! 🚀", "La tua password è stata aggiornata con successo.");
+      setPassword('');
+      window.location.hash = "";
+      showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato.");
       fetchData();
       setActiveTab('home');
     }
@@ -206,7 +215,7 @@ export default function Home() {
     if (authMode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        showAlert("Errore Login", "Credenziali non valide. Controlla e riprova."); 
+        showAlert("Errore Login", "Credenziali non valide o account non confermato."); 
       } else {
         setEmail(''); setPassword('');
       }
@@ -589,7 +598,7 @@ export default function Home() {
           </button>
         </div>
         {modal.isOpen && (
-          <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
               <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
               <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
@@ -661,7 +670,7 @@ export default function Home() {
 
         {/* MODALE ALERTS PER LA SCHERMATA LOGIN */}
         {modal.isOpen && (
-          <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
               <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
               <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
@@ -1284,246 +1293,77 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO --- */}
-      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[100]">
-        <div className="grid grid-cols-6 max-w-md mx-auto px-1 pt-2 pb-4 sm:pb-6">
-          
-          <button 
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('home'); }} 
-            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'home' ? 'scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'scale-100'}`}>🔥</span>
+      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 6) --- */}
+      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[200]">
+        <div className="grid grid-cols-6 max-w-md mx-auto px-1 pt-2 pb-6">
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400'}`}>
+            <span className="text-xl sm:text-2xl">🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
           </button>
-          
-          <button 
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('gironi'); }} 
-            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'gironi' ? 'scale-110 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'scale-100'}`}>📊</span>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400'}`}>
+            <span className="text-xl sm:text-2xl">📊</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Gironi</span>
           </button>
-          
-          <button 
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('calendario'); }} 
-            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'calendario' ? 'scale-110 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]' : 'scale-100'}`}>📅</span>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400'}`}>
+            <span className="text-xl sm:text-2xl">📅</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Orari</span>
           </button>
-          
-          <button 
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('playoff'); }} 
-            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'playoff' ? 'scale-110 drop-shadow-[0_0_8px_rgba(219,39,119,0.8)]' : 'scale-100'}`}>🏆</span>
+          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400'}`}>
+            <span className="text-xl sm:text-2xl">🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
           </button>
-          
-          <button 
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('shop'); }} 
-            className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
-          >
-            <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'shop' ? 'scale-110 drop-shadow-[0_0_8px_rgba(192,132,252,0.8)]' : 'scale-100'}`}>🛍️</span>
+          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400'}`}>
+            <span className="text-xl sm:text-2xl">🛍️</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Shop</span>
           </button>
-          
-          {/* ICONA DINAMICA: ADMIN / LOGOUT */}
           {isAdminUnlocked ? (
-            <button 
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab('admin'); }} 
-              className={`flex flex-col items-center justify-center w-full transition-all duration-200 cursor-pointer relative z-[200] touch-manipulation ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              <span className={`text-xl sm:text-2xl transition-all duration-200 ${activeTab === 'admin' ? 'scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'scale-100'}`}>⚙️</span>
+            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400'}`}>
+              <span className="text-xl sm:text-2xl">⚙️</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Admin</span>
             </button>
           ) : (
-            <button 
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptLogout(); }} 
-              className="flex flex-col items-center justify-center w-full text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 cursor-pointer relative z-[200] touch-manipulation"
-            >
-              <span className="text-xl sm:text-2xl scale-100 drop-shadow-none">🚪</span>
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptLogout(); }} className="flex flex-col items-center justify-center text-slate-400 active:text-white touch-manipulation relative z-[210]">
+              <span className="text-xl sm:text-2xl">🚪</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Esci</span>
             </button>
           )}
-
         </div>
       </nav>
 
-      {/* --- MODALE CREA GIOCO/EVENTO (ADMIN) --- */}
-      {isNewGameModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Crea Calendario</h3>
-            <div className="space-y-4 mb-8">
-              
-              <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                <input type="checkbox" id="isEventToggle" checked={newGame.is_event} onChange={(e) => setNewGame({...newGame, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
-                <label htmlFor="isEventToggle" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">EVENTO SPECIALE</label>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Fase / Giorno</label>
-                <select value={newGame.stage} onChange={(e) => setNewGame({...newGame, stage: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black mb-3">
-                  <option value="girone">Giorno 1 - Qualifiche</option>
-                  <option value="finali">Giorno 2 - Playoff/Finali</option>
-                </select>
-              </div>
-
-              {newGame.is_event ? (
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Nome Evento</label>
-                    <input type="text" placeholder="GARA DA 3 PUNTI" value={newGame.event_description} onChange={(e) => setNewGame({...newGame, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase placeholder-slate-600" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in min (slitta successivi)</label>
-                    <input type="number" placeholder="30" value={newGame.event_duration} onChange={(e) => setNewGame({...newGame, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3">
-                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Casa</label><select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Squadra Ospite</label><select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">Seleziona...</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-[2fr_1fr] gap-4 mt-4">
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
-                  <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
-                </div>
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
-                  <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <button onClick={createGame} className={`text-slate-900 py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black ${newGame.is_event ? 'bg-pink-500 shadow-pink-500/20' : 'bg-cyan-500 shadow-cyan-500/20'}`}>Conferma e Crea</button>
-              <button onClick={() => setIsNewGameModalOpen(false)} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest font-black">Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE EDIT GIOCO/EVENTO (ADMIN) --- */}
-      {gameToEdit && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="text-lg font-black uppercase mb-4 text-cyan-400 border-b border-slate-800 pb-2 italic tracking-widest font-black">Modifica {gameToEdit.is_event ? 'Evento' : `Partita ${gameToEdit.bracket_code ? `(${gameToEdit.bracket_code})` : ''}`}</h3>
-            <div className="space-y-4 mb-8">
-              
-              <div className="flex items-center gap-2 mb-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                <input type="checkbox" id="isEventToggleEdit" checked={gameToEdit.is_event} onChange={(e) => setGameToEdit({...gameToEdit, is_event: e.target.checked})} className="w-4 h-4 accent-pink-500 rounded cursor-pointer" />
-                <label htmlFor="isEventToggleEdit" className="text-[10px] font-black uppercase text-slate-300 tracking-widest cursor-pointer leading-tight">EVENTO SPECIALE</label>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Fase / Giorno</label>
-                <select value={gameToEdit.stage === 'girone' || !gameToEdit.stage ? 'girone' : 'finali'} onChange={(e) => setGameToEdit({...gameToEdit, stage: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black mb-3">
-                  <option value="girone">Giorno 1 - Qualifiche</option>
-                  <option value="finali">Giorno 2 - Playoff/Finali</option>
-                </select>
-              </div>
-
-              {gameToEdit.is_event ? (
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Nome Evento</label>
-                    <input type="text" placeholder="GARA DA 3 PUNTI" value={gameToEdit.event_description || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_description: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black uppercase" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase text-pink-500 block mb-1 tracking-widest font-black">Durata in minuti</label>
-                    <input type="number" placeholder="30" value={gameToEdit.event_duration || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_duration: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-pink-500 font-black" />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2">
-                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Casa</label><select value={gameToEdit.home_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, home_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                  <div><label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Squadra Ospite</label><select value={gameToEdit.away_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, away_team_id: e.target.value})} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-xs outline-none focus:border-cyan-500 font-black"><option value="">TBD (Vuota)</option>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-[2fr_1fr] gap-4 mt-4">
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Orario</label>
-                  <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({ ...gameToEdit, match_time: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-mono outline-none focus:border-cyan-500 font-black" />
-                </div>
-                <div className="min-w-0">
-                  <label className="text-[10px] font-black uppercase text-slate-500 block mb-1 tracking-widest font-black">Campo</label>
-                  <select value={gameToEdit.court} onChange={(e) => setGameToEdit({ ...gameToEdit, court: e.target.value })} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-cyan-500 font-black">
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <button onClick={saveQuickEdit} className="bg-cyan-500 text-slate-900 py-3 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest font-black">Salva Modifiche</button>
-              <div className="flex gap-2"><button onClick={() => deleteGame(gameToEdit.id)} className="flex-1 bg-pink-600 text-white py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black shadow-lg shadow-pink-500/20">Elimina</button><button onClick={() => setGameToEdit(null)} className="flex-1 bg-slate-800 text-slate-400 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest font-black">Chiudi</button></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE FAI OFFERTA BUSTA CHIUSA --- */}
-      {isBidModalOpen && selectedBidItem && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-xl font-black uppercase mb-1 text-white italic tracking-widest">Piazza Offerta</h3>
-            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase tracking-widest">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
-            
-            {bidError && (
-              <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest mb-6 text-center animate-pulse">
-                {bidError}
-              </div>
-            )}
-
-            <div className="space-y-4 mb-8">
-              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
-                <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mb-1">Stai offrendo come:</p>
-                <p className="text-sm text-slate-300 font-black uppercase">{user?.user_metadata?.full_name || extractNameFromEmail(user?.email)}</p>
-                <p className="text-[10px] text-slate-500 font-mono mt-0.5">{user?.email}</p>
-              </div>
-
-              <div>
-                <label className="text-[9px] font-black uppercase text-pink-500 tracking-widest block mb-1">La tua offerta (€)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-500 font-black">€</span>
-                  <input type="number" step="0.50" placeholder={`${selectedBidItem.base_price}`} value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 pl-10 rounded-xl border border-pink-900 text-xl outline-none focus:border-pink-500 font-black transition-colors" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={submitBid} 
-                disabled={isSubmittingBid}
-                className={`text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest w-full transition-transform ${isSubmittingBid ? 'bg-pink-800 cursor-not-allowed opacity-70' : 'bg-pink-600 active:scale-95 hover:bg-pink-500'}`}
-              >
-                {isSubmittingBid ? 'Invio in corso...' : 'Invia Busta Chiusa 🤫'}
-              </button>
-              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full">Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE ALERTS PRINCIPALE (z-index assoluto) --- */}
+      {/* --- MODALE ALERTS / CONFERME (Z-INDEX 300) --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic">{modal.title}</h3>
+            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight">{modal.message}</p>
             <div className="flex justify-end gap-3">
-              {modal.type === 'confirm' && (
-                <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
-              )}
-              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Conferma</button>
+              {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest">Annulla</button>}
+              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg active:scale-95">Conferma</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE ASTA BUSTA CHIUSA --- */}
+      {isBidModalOpen && selectedBidItem && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
+            <h3 className="text-xl font-black uppercase mb-1 text-white italic">Piazza Offerta</h3>
+            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
+            {bidError && <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase mb-6 text-center">{bidError}</div>}
+            <div className="space-y-4 mb-8">
+              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
+                <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Stai offrendo come:</p>
+                <p className="text-sm text-slate-300 font-black uppercase">{user?.user_metadata?.full_name || extractNameFromEmail(user?.email)}</p>
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase text-pink-500 block mb-1">La tua offerta (€)</label>
+                <input type="number" step="0.50" value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 rounded-xl border border-pink-900 text-xl outline-none font-black" />
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button onClick={submitBid} disabled={isSubmittingBid} className="text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg bg-pink-600 active:scale-95">{isSubmittingBid ? 'Invio...' : 'Invia Busta Chiusa 🤫'}</button>
+              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] w-full">Annulla</button>
             </div>
           </div>
         </div>
