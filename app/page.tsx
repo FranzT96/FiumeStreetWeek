@@ -78,7 +78,7 @@ export default function Home() {
 
   useEffect(() => {
     checkSession();
-    fetchData(); // <--- AGGIUNTO QUI: scarica i dati subito per chiunque apra l'app!
+    fetchData(); 
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
@@ -101,7 +101,9 @@ export default function Home() {
     };
   }, []);
 
-  // IL VECCHIO useEffect(() => { if(user) fetchData(); }, [user]); E' STATO COMPLETAMENTE CANCELLATO.
+  useEffect(() => {
+    if (user) fetchData();
+  }, [user]);
 
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
@@ -138,7 +140,7 @@ export default function Home() {
       setEmail(''); 
       setPassword('');
       setIsSecretLoginOpen(false);
-      setActiveTab('admin'); // Porta l'admin direttamente al pannello
+      setActiveTab('admin'); 
     }
     setIsAuthLoading(false);
   };
@@ -412,7 +414,7 @@ export default function Home() {
 
   // --- LOADING INIZIALE ---
   if (loading || authChecking) {
-    return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
+    return <div className="min-h-screen bg-gradient-to-b from-[#090214] to-[#200535] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
   }
 
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
@@ -425,16 +427,18 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-28 select-none">
+    <main className="min-h-screen bg-gradient-to-b from-[#090214] to-[#200535] p-3 md:p-8 font-sans text-purple-200 pb-28 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* --- LOGO CON EASTER EGG (3 SECONDI) --- */}
         {activeTab === 'home' && (
-          <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
+          <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in relative">
+            {/* Bagliore dietro il logo per richiamare il sole/neon vaporwave */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-pink-600/30 rounded-full blur-[80px] pointer-events-none"></div>
             <img 
               src="/icon.png" 
               alt="Fiume Street Week Logo" 
-              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain cursor-pointer" 
+              className="w-56 md:w-80 h-auto drop-shadow-[0_0_20px_rgba(6,182,212,0.5)] object-contain cursor-pointer relative z-10" 
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerUpOrLeave}
               onPointerLeave={handlePointerUpOrLeave}
@@ -446,34 +450,34 @@ export default function Home() {
 
         {/* --- HOME TAB --- */}
         {activeTab === 'home' && (
-          <section className="animate-fade-in space-y-8">
+          <section className="animate-fade-in space-y-8 relative z-10">
             <div>
-              <h2 className="text-xl font-black text-pink-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic mb-4">
-                <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse"></span> Live Now
+              <h2 className="text-xl font-black uppercase flex items-center gap-2 border-b-2 border-[#3d135e] pb-2 italic mb-4 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-400">
+                <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,1)]"></span> Live Now
               </h2>
               <div className={`grid gap-4 ${liveGames.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                 {liveGames.length === 0 ? (
-                  <p className="text-slate-600 font-black uppercase text-[10px] italic tracking-widest bg-slate-900/50 p-6 rounded-xl border border-slate-800">Nessun match in corso...</p>
+                  <p className="text-purple-400 font-black uppercase text-[10px] italic tracking-widest bg-[#110524]/80 backdrop-blur-md p-6 rounded-xl border border-[#3d135e]">Nessun match in corso...</p>
                 ) : liveGames.map(game => {
                   if (game.is_event) {
                     return (
-                      <div key={game.id} className="bg-gradient-to-r from-pink-900/50 to-orange-900/50 border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[6px_6px_0px_0px_rgba(236,72,153,1)] overflow-hidden min-h-[120px]">
-                        <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10">CAMPO {game.court}</div>
-                        <span className="text-3xl mb-2 animate-pulse">🔥</span>
+                      <div key={game.id} className="bg-gradient-to-br from-[#2a063b] to-[#120322] border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[0_0_20px_rgba(236,72,153,0.4)] overflow-hidden min-h-[120px]">
+                        <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
+                        <span className="text-3xl mb-2 animate-pulse drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">🔥</span>
                         <p className="text-[14px] text-white font-black uppercase leading-tight text-center tracking-widest px-4">{game.event_description}</p>
                       </div>
                     );
                   }
                   return (
-                    <div key={game.id} className="bg-slate-900 border-2 border-pink-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[6px_6px_0px_0px_rgba(6,182,212,1)] overflow-hidden">
-                      <div className="absolute top-0 right-0 bg-orange-500 text-black font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10">CAMPO {game.court}</div>
+                    <div key={game.id} className="bg-[#110524]/90 backdrop-blur-lg border-2 border-cyan-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[0_0_20px_rgba(6,182,212,0.4)] overflow-hidden">
+                      <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
                       <div className="flex flex-col justify-between text-center w-[40%] mt-4">
-                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.home_team?.name || 'TBD'}</p>
+                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.home_team?.name || 'TBD'}</p>
                         <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.home_score}</p>
                       </div>
-                      <div className="flex flex-col justify-center text-center w-[20%] mt-4"><span className="text-pink-500 font-black italic animate-pulse">VS</span></div>
+                      <div className="flex flex-col justify-center text-center w-[20%] mt-4"><span className="text-pink-500 font-black italic animate-pulse drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">VS</span></div>
                       <div className="flex flex-col justify-between text-center w-[40%] mt-4">
-                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words">{game.away_team?.name || 'TBD'}</p>
+                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.away_team?.name || 'TBD'}</p>
                         <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.away_score}</p>
                       </div>
                     </div>
@@ -484,25 +488,25 @@ export default function Home() {
 
             {nextGames.length > 0 && (
               <div>
-                <h2 className="text-lg font-black text-slate-500 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossimi Eventi</h2>
+                <h2 className="text-lg font-black text-purple-300 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossimi Eventi</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {nextGames.map(game => {
                     if (game.is_event) {
                       return (
-                        <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border border-pink-500/50 rounded-xl p-3 shadow-lg">
-                          <div className="font-mono font-black text-orange-400 text-xs">{game.match_time}</div>
+                        <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 bg-[#1a0833]/80 backdrop-blur-sm border border-pink-500/50 rounded-xl p-3 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
+                          <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
                           <div className="text-center font-black text-pink-300 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                          <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-sm">{game.court}</span></div>
+                          <div className="flex justify-end pr-1"><span className="bg-pink-600 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
                         </div>
                       );
                     }
                     return (
-                      <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 bg-slate-800/40 border border-slate-700/50 rounded-xl p-3 shadow-lg">
-                        <div className="font-mono font-black text-orange-500 text-xs">{game.match_time}</div>
-                        <div className="text-right font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
-                        <div className="text-center text-slate-600 font-black italic text-[10px] px-1">VS</div>
-                        <div className="text-left font-bold text-slate-300 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                        <div className="flex justify-end pr-1"><span className="bg-orange-500 text-black font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-sm">{game.court}</span></div>
+                      <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 bg-[#110524]/60 backdrop-blur-sm border border-[#3d135e] rounded-xl p-3 shadow-lg">
+                        <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
+                        <div className="text-right font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                        <div className="text-center text-purple-500 font-black italic text-[10px] px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
+                        <div className="text-left font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                        <div className="flex justify-end pr-1"><span className="bg-cyan-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(6,182,212,0.6)]">{game.court}</span></div>
                       </div>
                     );
                   })}
@@ -514,33 +518,33 @@ export default function Home() {
 
         {/* --- GIRONI TAB --- */}
         {activeTab === 'gironi' && (
-          <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
             {groups.map((group) => (
-              <div key={group} className="bg-slate-900 rounded-2xl border-4 border-cyan-500 shadow-[6px_6px_0px_0px_rgba(249,115,22,1)] overflow-hidden">
-                <div className="bg-cyan-500 text-slate-900 p-2 text-center"><h3 className="text-xl font-black uppercase italic">GIRONE {group}</h3></div>
+              <div key={group} className="bg-[#110524]/80 backdrop-blur-lg rounded-2xl border border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] overflow-hidden">
+                <div className="bg-cyan-500 text-[#090214] p-2 text-center shadow-[0_0_15px_rgba(6,182,212,0.5)]"><h3 className="text-xl font-black uppercase italic">GIRONE {group}</h3></div>
                 <div className="p-3 space-y-2">
-                  <div className="flex justify-between px-3 pb-1 text-[10px] font-black text-slate-400 border-b border-slate-700/50">
+                  <div className="flex justify-between px-3 pb-1 text-[10px] font-black text-purple-400 border-b border-[#3d135e]">
                     <div className="w-1/2">SQUADRA</div>
                     <div className="flex w-1/2 justify-end gap-2 font-mono text-center">
-                      <span className="w-4" title="Vinte">V</span><span className="w-4" title="Perse">P</span><span className="w-6" title="Punti Fatti">PF</span><span className="w-6" title="Punti Subiti">PS</span><span className="w-6 text-orange-500" title="Punti in Classifica">PT</span>
+                      <span className="w-4" title="Vinte">V</span><span className="w-4" title="Perse">P</span><span className="w-6" title="Punti Fatti">PF</span><span className="w-6" title="Punti Subiti">PS</span><span className="w-6 text-yellow-400 drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]" title="Punti in Classifica">PT</span>
                     </div>
                   </div>
                   {teams.filter((t) => t.group_name === group).map((team, index) => (
-                    <details key={team.id} className="bg-slate-800/50 rounded-lg border border-slate-700 cursor-pointer hover:bg-slate-800/80 transition-colors group">
-                      <summary className="p-3 font-bold text-slate-200 flex justify-between items-start list-none">
+                    <details key={team.id} className="bg-[#1a0833]/60 rounded-lg border border-[#3d135e] cursor-pointer hover:bg-[#260c49]/80 transition-colors group">
+                      <summary className="p-3 font-bold text-purple-100 flex justify-between items-start list-none">
                         <div className="flex items-start gap-2 w-1/2">
-                          <span className="text-orange-500 font-black text-xs shrink-0 mt-[2px]">{index + 1}.</span>
-                          <span className="uppercase text-[10px] font-black truncate group-open:whitespace-normal group-open:break-words leading-tight">{team.name}</span>
+                          <span className="text-yellow-400 font-black text-xs shrink-0 mt-[2px] drop-shadow-[0_0_2px_rgba(250,204,21,0.8)]">{index + 1}.</span>
+                          <span className="uppercase text-[10px] font-black truncate group-open:whitespace-normal group-open:break-words leading-tight drop-shadow-[0_0_2px_rgba(255,255,255,0.3)]">{team.name}</span>
                         </div>
                         <div className="flex w-1/2 justify-end gap-2 text-[10px] font-mono text-center items-center">
-                          <span className="text-slate-400 w-4">{team.wins}</span><span className="text-slate-400 w-4">{team.losses}</span><span className="text-cyan-500 w-6">{team.pf}</span><span className="text-pink-500 w-6">{team.ps}</span><span className="text-orange-400 w-6 font-black text-xs">{team.points}</span>
+                          <span className="text-purple-300 w-4">{team.wins}</span><span className="text-purple-300 w-4">{team.losses}</span><span className="text-cyan-400 w-6 drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{team.pf}</span><span className="text-pink-400 w-6 drop-shadow-[0_0_3px_rgba(236,72,153,0.5)]">{team.ps}</span><span className="text-yellow-400 w-6 font-black text-xs drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]">{team.points}</span>
                         </div>
                       </summary>
-                      <div className="p-4 bg-slate-900/80 border-t border-slate-700 mt-1">
+                      <div className="p-4 bg-[#090214]/80 border-t border-[#3d135e] mt-1">
                         <ul className="grid grid-cols-2 gap-3">
                           {team.players.map((player: any) => (
-                            <li key={player.id} className="text-slate-300 flex items-start gap-1.5 text-[10px] font-bold uppercase leading-tight break-words">
-                              <span className="bg-pink-500 w-1.5 h-1.5 rounded-full shrink-0 mt-[3px]"></span>
+                            <li key={player.id} className="text-purple-200 flex items-start gap-1.5 text-[10px] font-bold uppercase leading-tight break-words">
+                              <span className="bg-pink-500 shadow-[0_0_5px_rgba(236,72,153,0.8)] w-1.5 h-1.5 rounded-full shrink-0 mt-[3px]"></span>
                               {player.name}
                             </li>
                           ))}
@@ -556,14 +560,14 @@ export default function Home() {
 
         {/* --- CALENDARIO PUBBLICO --- */}
         {activeTab === 'calendario' && (
-          <section className="animate-fade-in space-y-4 pt-4">
+          <section className="animate-fade-in space-y-4 pt-4 relative z-10">
             
-            <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 mb-6">
-              <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>Qualifiche</button>
-              <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>Finali</button>
+            <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] mb-6 shadow-lg">
+              <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Qualifiche</button>
+              <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Finali</button>
             </div>
 
-            <div className="bg-slate-900/80 border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]">
               {(() => {
                 const list = activeScheduleTab === 'qualifiche' 
                   ? sortedGames.filter(g => !g.stage || g.stage === 'girone')
@@ -571,29 +575,29 @@ export default function Home() {
                 
                 const displayList = (activeScheduleTab === 'finali' && list.length === 0) ? dummyFinals : list;
 
-                if (displayList.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px]">Nessun match trovato.</div>;
+                if (displayList.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun match trovato.</div>;
 
                 return displayList.map((game, i) => {
                   if (game.is_event) {
                     return (
-                      <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 p-3 bg-gradient-to-r from-pink-900/40 to-orange-900/40 border-b border-slate-800 last:border-0">
-                        <div className="font-mono font-black text-orange-400 text-[10px]">{game.match_time}</div>
-                        <div className="text-center font-black text-pink-400 text-[11px] uppercase leading-tight tracking-widest break-words px-2">{game.event_description}</div>
-                        <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-sm">{game.court}</span></div>
+                      <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 p-3 bg-gradient-to-r from-[#2a063b] to-[#1a0525] border-b border-[#3d135e] last:border-0 shadow-inner">
+                        <div className="font-mono font-black text-yellow-400 text-[10px] drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]">{game.match_time}</div>
+                        <div className="text-center font-black text-pink-400 text-[11px] uppercase leading-tight tracking-widest break-words px-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.3)]">{game.event_description}</div>
+                        <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
                       </div>
                     );
                   }
                   return (
-                    <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                      <div className="font-mono font-black text-pink-500 text-[10px]">{game.match_time}</div>
-                      <div className="text-right font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                    <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
+                      <div className="font-mono font-black text-cyan-400 text-[10px] drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</div>
+                      <div className="text-right font-black text-purple-100 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
                       <div className="flex justify-center items-center px-1">
                         {game.status === 'finita' ? (
-                          <div className="bg-slate-800 border-2 border-slate-700 px-1.5 py-0.5 rounded text-white font-black text-[10px] shadow-sm">{game.home_score}-{game.away_score}</div>
-                        ) : <div className="text-slate-600 font-black italic text-[9px]">VS</div>}
+                          <div className="bg-[#1a0833] border border-cyan-500/50 px-1.5 py-0.5 rounded text-cyan-300 font-black text-[10px] shadow-[0_0_5px_rgba(6,182,212,0.3)]">{game.home_score}-{game.away_score}</div>
+                        ) : <div className="text-purple-500 font-black italic text-[9px] drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>}
                       </div>
-                      <div className="text-left font-black text-cyan-400 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                      <div className="flex justify-end pr-1"><span className="bg-orange-500 text-black font-black text-[10px] w-6 h-6 flex items-center justify-center rounded">{game.court}</span></div>
+                      <div className="text-left font-black text-purple-100 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                      <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(250,204,21,0.6)]">{game.court}</span></div>
                     </div>
                   );
                 });
@@ -604,13 +608,13 @@ export default function Home() {
 
         {/* --- PLAYOFF TAB PUBBLICO --- */}
         {activeTab === 'playoff' && (
-          <section className="animate-fade-in pt-4">
-            <h2 className="text-xl font-black text-orange-500 uppercase border-b-2 border-slate-800 pb-2 italic tracking-widest mb-4">Tabellone Finale</h2>
+          <section className="animate-fade-in pt-4 relative z-10">
+            <h2 className="text-xl font-black uppercase border-b-2 border-[#3d135e] pb-2 italic tracking-widest mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]">Tabellone Finale</h2>
             
             {games.filter(g => g.stage && g.stage !== 'girone').length === 0 ? (
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center mt-8">
-                <p className="text-slate-500 font-black uppercase tracking-widest text-sm italic">Tabellone in via di definizione...</p>
-                <p className="text-slate-600 text-xs font-bold mt-2">I playoff appariranno qui al termine della fase a gironi.</p>
+              <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-8">
+                <p className="text-purple-400 font-black uppercase tracking-widest text-sm italic">Tabellone in via di definizione...</p>
+                <p className="text-purple-500/70 text-xs font-bold mt-2">I playoff appariranno qui al termine della fase a gironi.</p>
               </div>
             ) : (
               <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar px-2">
@@ -620,33 +624,33 @@ export default function Home() {
                   
                   return (
                     <div key={stage} className="min-w-[85vw] sm:min-w-[320px] snap-center flex flex-col gap-4 relative">
-                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase tracking-widest text-sm shadow-md">
+                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase tracking-widest text-sm shadow-[0_0_15px_rgba(236,72,153,0.5)] z-10">
                         {stage === 'finali' ? 'FINALI' : stage}
                       </div>
                       
                       {stageGames.map((game, i) => {
                         if(game.is_event) return null; 
                         return (
-                          <div key={game.id} className="bg-slate-900 border-2 border-cyan-500 rounded-xl p-4 flex flex-col justify-between relative shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]">
-                            <div className="absolute top-0 left-0 bg-cyan-500 text-slate-900 font-black text-[8px] px-2 py-1 rounded-br-lg rounded-tl-[10px] uppercase">MATCH {game.bracket_code}</div>
-                            <div className="absolute top-0 right-0 bg-slate-800 text-slate-400 font-black text-[8px] px-2 py-1 rounded-bl-lg rounded-tr-[10px] uppercase">{game.match_time} | C.{game.court}</div>
+                          <div key={game.id} className="bg-[#110524]/90 backdrop-blur-md border border-cyan-500 rounded-xl p-4 flex flex-col justify-between relative shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                            <div className="absolute top-0 left-0 bg-cyan-500 text-[#090214] font-black text-[8px] px-2 py-1 rounded-br-lg rounded-tl-[10px] uppercase shadow-[0_0_8px_rgba(6,182,212,0.6)]">MATCH {game.bracket_code}</div>
+                            <div className="absolute top-0 right-0 bg-[#1a0833] border-b border-l border-cyan-500/30 text-purple-300 font-black text-[8px] px-2 py-1 rounded-bl-lg rounded-tr-[10px] uppercase">{game.match_time} | C.{game.court}</div>
                             
                             <div className="mt-4 flex justify-between items-center w-full">
-                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.home_team ? 'text-slate-200' : 'text-slate-600 italic'}`}>
+                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.home_team ? 'text-purple-100' : 'text-purple-500 italic'}`}>
                                 {renderTeamName(game.home_team, game.bracket_code, true)}
                               </span>
-                              <span className={`text-2xl font-black ${game.home_team ? 'text-white' : 'text-slate-700'}`}>{game.home_score}</span>
+                              <span className={`text-2xl font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.home_team ? 'text-white' : 'text-[#3d135e]'}`}>{game.home_score}</span>
                             </div>
                             
-                            <div className="w-full h-px bg-slate-800 my-3 relative">
-                              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900 px-2 text-[9px] font-black text-pink-500 italic">VS</span>
+                            <div className="w-full h-px bg-gradient-to-r from-transparent via-[#3d135e] to-transparent my-3 relative">
+                              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#110524] px-2 text-[9px] font-black text-pink-500 italic drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]">VS</span>
                             </div>
                             
                             <div className="flex justify-between items-center w-full">
-                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.away_team ? 'text-slate-200' : 'text-slate-600 italic'}`}>
+                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.away_team ? 'text-purple-100' : 'text-purple-500 italic'}`}>
                                 {renderTeamName(game.away_team, game.bracket_code, false)}
                               </span>
-                              <span className={`text-2xl font-black ${game.away_team ? 'text-white' : 'text-slate-700'}`}>{game.away_score}</span>
+                              <span className={`text-2xl font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.away_team ? 'text-white' : 'text-[#3d135e]'}`}>{game.away_score}</span>
                             </div>
                           </div>
                         )
@@ -661,25 +665,25 @@ export default function Home() {
 
         {/* --- ADMIN AREA --- */}
         {activeTab === 'admin' && isAdminUnlocked && (
-          <section className="animate-fade-in space-y-6">
+          <section className="animate-fade-in space-y-6 relative z-10">
             
-            <div className="flex justify-between items-center border-b-2 border-orange-500 pb-2 pt-4 relative z-[100]">
-              <h2 className="text-2xl font-black text-orange-500 uppercase italic m-0 leading-none">Control Panel</h2>
+            <div className="flex justify-between items-center border-b-2 border-yellow-400 pb-2 pt-4 relative z-[100]">
+              <h2 className="text-2xl font-black uppercase italic m-0 leading-none text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]">Control Panel</h2>
               <div className="relative">
                 <button 
                   onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)} 
-                  className="bg-slate-800 text-slate-400 border border-slate-700 w-9 h-9 rounded-lg hover:bg-slate-700 hover:text-white transition-colors flex items-center justify-center shadow-lg text-lg pb-1 relative z-20"
+                  className="bg-[#1a0833] text-purple-300 border border-[#3d135e] w-9 h-9 rounded-lg hover:bg-[#260c49] hover:text-white transition-all hover:shadow-[0_0_10px_rgba(168,85,247,0.4)] flex items-center justify-center shadow-lg text-lg pb-1 relative z-20"
                 >
                   ⋮
                 </button>
                 {isAdminMenuOpen && (
                   <>
                     <div className="fixed inset-0 cursor-default" onClick={() => setIsAdminMenuOpen(false)}></div>
-                    <div className="absolute right-0 mt-2 w-48 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
-                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-red-500 hover:bg-slate-800 border-b border-slate-800 flex items-center gap-3 transition-colors relative z-10">
+                    <div className="absolute right-0 mt-2 w-48 bg-[#110524]/95 backdrop-blur-md border border-pink-500 rounded-xl shadow-[0_0_20px_rgba(236,72,153,0.3)] z-50 overflow-hidden animate-fade-in">
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => resetTournament(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-pink-500 hover:bg-pink-900/50 border-b border-[#3d135e] flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
+                      <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-purple-200 hover:bg-cyan-900/50 hover:text-cyan-300 flex items-center gap-3 transition-colors relative z-10">
                         <span className="text-sm">🚪</span> Esci dal Pannello
                       </button>
                     </div>
@@ -688,99 +692,99 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800 overflow-x-auto hide-scrollbar relative z-10">
-              <button onClick={() => setActiveAdminSubTab('live')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'live' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500'}`}>🟢 Live</button>
-              <button onClick={() => setActiveAdminSubTab('orari')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
-              <button onClick={() => setActiveAdminSubTab('roster')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
-              <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
+            <div className="flex gap-1 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] overflow-x-auto hide-scrollbar relative z-10 shadow-lg">
+              <button onClick={() => setActiveAdminSubTab('live')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] transition-all ${activeAdminSubTab === 'live' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.6)]' : 'text-purple-400 hover:text-purple-200'}`}>🟢 Live</button>
+              <button onClick={() => setActiveAdminSubTab('orari')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] transition-all ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.6)]' : 'text-purple-400 hover:text-purple-200'}`}>📅 Orari</button>
+              <button onClick={() => setActiveAdminSubTab('roster')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] transition-all ${activeAdminSubTab === 'roster' ? 'bg-yellow-400 text-[#090214] shadow-[0_0_10px_rgba(250,204,21,0.6)]' : 'text-purple-400 hover:text-purple-200'}`}>🏀 Roster</button>
+              <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] transition-all ${activeAdminSubTab === 'playoff' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-[0_0_10px_rgba(168,85,247,0.6)]' : 'text-purple-400 hover:text-purple-200'}`}>🏆 Playoff</button>
             </div>
 
             {/* LIVE CONTROL */}
             {activeAdminSubTab === 'live' && (
               <div className="space-y-4 pb-20">
                 
-                <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 mb-6">
-                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>Qualifiche</button>
-                  <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>Finali</button>
+                <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] mb-6 shadow-lg">
+                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Qualifiche</button>
+                  <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Finali</button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-6">
                   {(() => {
                     const filteredLiveGames = adminLiveGames.filter(g => activeScheduleTab === 'qualifiche' ? (!g.stage || g.stage === 'girone') : (g.stage && g.stage !== 'girone'));
 
-                    if (filteredLiveGames.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun evento in questa fase.</div>;
+                    if (filteredLiveGames.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px] bg-[#110524]/60 backdrop-blur-sm rounded-xl border border-[#3d135e]">Nessun evento in questa fase.</div>;
 
                     return filteredLiveGames.map(game => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className={`bg-gradient-to-r from-pink-900/40 to-orange-900/40 p-4 rounded-xl border-2 transition-all ${game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(236,72,153,1)]' : game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-pink-500/50'}`}>
+                          <div key={game.id} className={`bg-gradient-to-br from-[#2a063b] to-[#120322] p-4 rounded-xl border transition-all ${game.status === 'in_corso' ? 'border-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.5)]' : game.status === 'finita' ? 'border-[#3d135e] opacity-60' : 'border-pink-500/30'}`}>
                              <div className="flex justify-between items-center mb-3">
-                               <span className="text-[10px] text-slate-300 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court}</span>
-                               {game.status === 'finita' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}><span>↺</span> Riapri</button>}
+                               <span className="text-[10px] text-purple-300 font-mono font-black tracking-widest drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">{game.match_time} | CAMPO {game.court}</span>
+                               {game.status === 'finita' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-[#3d135e] cursor-not-allowed' : 'text-pink-500 hover:text-pink-400 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]'}`}><span>↺</span> Riapri</button>}
                              </div>
-                             <div className="flex flex-col items-center justify-center bg-black/60 p-4 rounded-lg mb-3 min-h-[80px] text-center">
-                               <span className="text-2xl mb-1">🔥</span>
-                               <p className="text-[12px] font-black uppercase text-pink-400 tracking-widest">{game.event_description}</p>
+                             <div className="flex flex-col items-center justify-center bg-[#090214]/60 p-4 rounded-lg mb-3 min-h-[80px] text-center border border-pink-500/20">
+                               <span className="text-2xl mb-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">🔥</span>
+                               <p className="text-[12px] font-black uppercase text-pink-400 tracking-widest drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">{game.event_description}</p>
                              </div>
                              <div className="flex justify-center px-1">
-                               {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-black text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-opacity ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : ''}`}>Avvia Evento</button>}
-                               {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest">Chiudi Evento</button>}
-                               {game.status === 'finita' && <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest block">Evento Terminato</span>}
+                               {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-[#090214] text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-all hover:shadow-[0_0_15px_rgba(6,182,212,0.8)] ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : 'shadow-[0_0_10px_rgba(6,182,212,0.5)]'}`}>Avvia Evento</button>}
+                               {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest shadow-[0_0_10px_rgba(236,72,153,0.6)]">Chiudi Evento</button>}
+                               {game.status === 'finita' && <span className="text-purple-500 text-[10px] font-black uppercase tracking-widest block">Evento Terminato</span>}
                              </div>
                           </div>
                         );
                       }
 
                       return (
-                        <div key={game.id} className={`bg-slate-900 p-4 rounded-xl border-2 transition-all overflow-hidden ${
-                          game.status === 'in_corso' ? 'border-pink-500 shadow-[6px_6px_0px_0px_rgba(6,182,212,1)]' : 
-                          game.status === 'finita' ? 'border-slate-800 opacity-60' : 'border-slate-700'
+                        <div key={game.id} className={`bg-[#110524]/90 backdrop-blur-md p-4 rounded-xl border transition-all overflow-hidden ${
+                          game.status === 'in_corso' ? 'border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 
+                          game.status === 'finita' ? 'border-[#3d135e] opacity-60' : 'border-cyan-900/40'
                         }`}>
                           <div className="flex justify-between items-center mb-3">
-                            <span className="text-[10px] text-slate-500 font-mono font-black tracking-widest">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
+                            <span className="text-[10px] text-purple-400 font-mono font-black tracking-widest drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">{game.match_time} | CAMPO {game.court} {game.bracket_code ? `| ${game.bracket_code}` : ''}</span>
                             {game.status === 'finita' && (
-                              <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-slate-600 cursor-not-allowed' : 'text-pink-500 hover:text-pink-400'}`}>
+                              <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`text-[10px] font-black uppercase flex items-center gap-1 transition-colors ${activeLiveGamesCount >= 2 ? 'text-[#3d135e] cursor-not-allowed' : 'text-cyan-400 hover:text-cyan-300 drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]'}`}>
                                 <span>↺</span> Riapri
                               </button>
                             )}
                           </div>
 
-                          <div className="flex justify-between items-stretch bg-black p-3 rounded-lg mb-3">
+                          <div className="flex justify-between items-stretch bg-[#090214]/80 p-3 rounded-lg mb-3 border border-[#3d135e]/50">
                             <div className="flex flex-col justify-between text-center w-[35%]">
-                              <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.home_team?.name || 'TBD'}</p>
-                              <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.home_score}</p>
+                              <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'text-purple-400'}`}>{game.home_team?.name || 'TBD'}</p>
+                              <p className={`text-3xl font-black mt-auto drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.status === 'in_corso' ? 'text-white' : 'text-purple-500'}`}>{game.home_score}</p>
                             </div>
                             
                             <div className="flex flex-col justify-center text-center w-[30%] px-1">
                               {game.status === 'programmata' && (
-                                <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2 || (!game.home_team_id || !game.away_team_id)} className={`bg-cyan-500 text-black text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-opacity ${(activeLiveGamesCount >= 2 || !game.home_team_id || !game.away_team_id) ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                                <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2 || (!game.home_team_id || !game.away_team_id)} className={`bg-cyan-500 text-[#090214] text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest transition-all ${(!game.home_team_id || !game.away_team_id) ? 'opacity-30 cursor-not-allowed' : activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-[0_0_15px_rgba(6,182,212,0.8)] shadow-[0_0_8px_rgba(6,182,212,0.5)]'}`}>
                                   Avvia
                                 </button>
                               )}
-                              {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest">Chiudi</button>}
-                              {game.status === 'finita' && <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
+                              {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest shadow-[0_0_8px_rgba(236,72,153,0.6)]">Chiudi</button>}
+                              {game.status === 'finita' && <span className="text-purple-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
                             </div>
 
                             <div className="flex flex-col justify-between text-center w-[35%]">
-                              <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400' : 'text-slate-500'}`}>{game.away_team?.name || 'TBD'}</p>
-                              <p className={`text-3xl font-black mt-auto ${game.status === 'in_corso' ? 'text-white' : 'text-slate-400'}`}>{game.away_score}</p>
+                              <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'text-purple-400'}`}>{game.away_team?.name || 'TBD'}</p>
+                              <p className={`text-3xl font-black mt-auto drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.status === 'in_corso' ? 'text-white' : 'text-purple-500'}`}>{game.away_score}</p>
                             </div>
                           </div>
 
                           {game.status === 'in_corso' && (
                             <div className="flex justify-between items-center w-full gap-2 mt-2">
                               <div className="flex gap-1">
-                                <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
-                                <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
-                                <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
-                                <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                                <button onClick={() => updateScore(game.id, 'home', -1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-pink-500/50 text-pink-500 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(236,72,153,0.3)]">-1</button>
+                                <button onClick={() => updateScore(game.id, 'home', 1, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-cyan-500/50 text-cyan-400 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(6,182,212,0.3)]">+1</button>
+                                <button onClick={() => updateScore(game.id, 'home', 2, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-cyan-500/50 text-cyan-400 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(6,182,212,0.3)]">+2</button>
+                                <button onClick={() => updateScore(game.id, 'home', 3, game.home_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-cyan-500/50 text-cyan-400 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(6,182,212,0.3)]">+3</button>
                               </div>
-                              <span className="text-[10px] text-slate-600 font-black italic">VS</span>
+                              <span className="text-[10px] text-purple-500 font-black italic drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</span>
                               <div className="flex gap-1">
-                                <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-red-500 font-black text-xs active:scale-95">-1</button>
-                                <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+1</button>
-                                <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+2</button>
-                                <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-slate-800 rounded border border-slate-700 text-cyan-400 font-black text-xs active:scale-95">+3</button>
+                                <button onClick={() => updateScore(game.id, 'away', -1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-pink-500/50 text-pink-500 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(236,72,153,0.3)]">-1</button>
+                                <button onClick={() => updateScore(game.id, 'away', 1, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-cyan-500/50 text-cyan-400 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(6,182,212,0.3)]">+1</button>
+                                <button onClick={() => updateScore(game.id, 'away', 2, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-cyan-500/50 text-cyan-400 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(6,182,212,0.3)]">+2</button>
+                                <button onClick={() => updateScore(game.id, 'away', 3, game.away_score)} className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[#1a0833] rounded border border-cyan-500/50 text-cyan-400 font-black text-xs active:scale-95 shadow-[0_0_5px_rgba(6,182,212,0.3)]">+3</button>
                               </div>
                             </div>
                           )}
@@ -795,14 +799,14 @@ export default function Home() {
             {/* ORARI ADMIN */}
             {activeAdminSubTab === 'orari' && (
               <div className="space-y-4 pb-20">
-                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-slate-900 border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-lg tracking-widest">➕ Nuova Voce Calendario</button>
+                <button onClick={() => setIsNewGameModalOpen(true)} className="w-full py-4 bg-[#110524]/60 backdrop-blur-sm border-2 border-dashed border-cyan-500/50 rounded-xl text-cyan-400 font-black uppercase text-xs shadow-[0_0_10px_rgba(6,182,212,0.2)] tracking-widest hover:border-cyan-400 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">➕ Nuova Voce Calendario</button>
                 
-                <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800 mb-6">
-                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>Qualifiche</button>
-                  <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>Finali</button>
+                <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] mb-6 shadow-lg">
+                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Qualifiche</button>
+                  <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Finali</button>
                 </div>
 
-                <div className="bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow-xl">
+                <div className="bg-[#110524]/80 backdrop-blur-md rounded-xl overflow-hidden border border-[#3d135e] shadow-[0_0_15px_rgba(0,0,0,0.5)]">
                   {(() => {
                     const list = activeScheduleTab === 'qualifiche' 
                       ? sortedGames.filter(g => !g.stage || g.stage === 'girone')
@@ -810,31 +814,31 @@ export default function Home() {
                     
                     const displayList = (activeScheduleTab === 'finali' && list.length === 0) ? dummyFinals : list;
 
-                    if (displayList.length === 0) return <div className="p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px]">Nessun elemento in calendario.</div>;
+                    if (displayList.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun elemento in calendario.</div>;
 
                     return displayList.map((game, i) => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className="grid grid-cols-[45px_1fr_40px_30px] items-center gap-2 p-3 hover:bg-slate-800/30 transition-colors bg-gradient-to-r from-pink-900/40 to-orange-900/40 border-b border-slate-800">
-                            <span className="font-mono text-orange-400 text-[10px] font-black">{game.match_time}</span>
-                            <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words px-2">{game.event_description}</span>
-                            <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded">{game.court}</span></div>
-                            <button onClick={() => setGameToEdit({ ...game })} className="text-slate-300 hover:text-white p-2 text-right">✏️</button>
+                          <div key={game.id} className="grid grid-cols-[45px_1fr_40px_30px] items-center gap-2 p-3 hover:bg-[#1a0833]/80 transition-colors bg-gradient-to-r from-[#2a063b] to-[#1a0525] border-b border-[#3d135e]">
+                            <span className="font-mono text-yellow-400 text-[10px] font-black drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]">{game.match_time}</span>
+                            <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words px-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.3)]">{game.event_description}</span>
+                            <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_5px_rgba(236,72,153,0.5)]">{game.court}</span></div>
+                            <button onClick={() => setGameToEdit({ ...game })} className="text-purple-400 hover:text-cyan-400 p-2 text-right transition-colors drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button>
                           </div>
                         );
                       }
 
                       return (
-                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px_30px] items-center gap-1 p-3 hover:bg-slate-800/30 transition-colors ${i !== displayList.length - 1 ? 'border-b border-slate-800' : ''}`}>
-                          <span className="font-mono text-cyan-400 text-[10px] font-black">{game.match_time}</span>
-                          <span className="text-[10px] font-black uppercase text-slate-200 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
-                          <span className="text-[8px] text-slate-600 italic font-black px-1">VS</span>
-                          <span className="text-[10px] font-black uppercase text-slate-200 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
-                          <div className="flex justify-end pr-1"><span className="bg-orange-500 text-black font-black text-[10px] w-6 h-6 flex items-center justify-center rounded">{game.court}</span></div>
+                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px_30px] items-center gap-1 p-3 hover:bg-[#1a0833]/80 transition-colors ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
+                          <span className="font-mono text-cyan-400 text-[10px] font-black drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</span>
+                          <span className="text-[10px] font-black uppercase text-purple-100 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
+                          <span className="text-[8px] text-purple-500 italic font-black px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</span>
+                          <span className="text-[10px] font-black uppercase text-purple-100 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
+                          <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_5px_rgba(250,204,21,0.5)]">{game.court}</span></div>
                           {game.id.toString().startsWith('d') ? (
                             <span className="w-8"></span> 
                           ) : (
-                            <button onClick={() => setGameToEdit({ ...game })} className="text-slate-500 hover:text-cyan-400 p-2 text-right">✏️</button>
+                            <button onClick={() => setGameToEdit({ ...game })} className="text-purple-400 hover:text-cyan-400 p-2 text-right transition-colors drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button>
                           )}
                         </div>
                       );
@@ -848,36 +852,36 @@ export default function Home() {
             {activeAdminSubTab === 'roster' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
                 {groups.map((group) => (
-                  <div key={group} className="bg-slate-900 rounded-2xl border-2 border-slate-800 overflow-hidden shadow-xl">
-                    <div className="bg-slate-800/50 p-2 text-center border-b border-slate-700"><h3 className="text-xs font-black uppercase text-orange-500 tracking-widest italic">Girone {group}</h3></div>
+                  <div key={group} className="bg-[#110524]/80 backdrop-blur-md rounded-2xl border border-cyan-500/50 overflow-hidden shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                    <div className="bg-[#1a0833] p-2 text-center border-b border-[#3d135e]"><h3 className="text-xs font-black uppercase text-yellow-400 tracking-widest italic drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]">Girone {group}</h3></div>
                     <div className="p-2 space-y-2">
                       {teams.filter(t => t.group_name === group).map((team) => (
-                        <details key={team.id} className="bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden group">
-                          <summary className="p-3 font-bold text-slate-200 flex justify-between items-center list-none cursor-pointer hover:bg-slate-800/50 transition-all">
+                        <details key={team.id} className="bg-[#090214]/60 rounded-xl border border-[#3d135e] overflow-hidden group">
+                          <summary className="p-3 font-bold text-purple-100 flex justify-between items-center list-none cursor-pointer hover:bg-[#1a0833] transition-all">
                             {editingTeam?.id === team.id ? (
                               <div className="flex gap-1 w-full" onClick={(e) => e.stopPropagation()}>
-                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none font-black" autoFocus />
-                                <button onClick={saveTeamName} className="bg-cyan-500 text-black px-3 rounded text-[9px] font-black uppercase">Ok</button>
+                                <input value={editingTeam?.name || ''} onChange={(e) => setEditingTeam(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-[#090214] text-cyan-400 p-1.5 rounded text-[10px] font-black uppercase border border-cyan-500 flex-1 outline-none shadow-[0_0_5px_rgba(6,182,212,0.3)]" autoFocus />
+                                <button onClick={saveTeamName} className="bg-cyan-500 text-[#090214] px-3 rounded text-[9px] font-black uppercase shadow-[0_0_8px_rgba(6,182,212,0.5)]">Ok</button>
                               </div>
                             ) : (
-                              <div className="flex items-center justify-between w-full"><span className="uppercase text-[10px] font-black tracking-tight">{team.name}</span><button onClick={(e) => { e.preventDefault(); setEditingTeam({id: team.id, name: team.name}); }} className="text-slate-500 hover:text-cyan-400 text-xs p-1">✏️</button></div>
+                              <div className="flex items-center justify-between w-full"><span className="uppercase text-[10px] font-black tracking-tight drop-shadow-[0_0_2px_rgba(255,255,255,0.3)]">{team.name}</span><button onClick={(e) => { e.preventDefault(); setEditingTeam({id: team.id, name: team.name}); }} className="text-purple-400 hover:text-cyan-400 text-xs p-1 drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button></div>
                             )}
                           </summary>
-                          <div className="p-3 bg-black/20 border-t border-slate-700/50 space-y-3">
+                          <div className="p-3 bg-[#090214] border-t border-[#3d135e] space-y-3">
                             <ul className="space-y-1">
                               {team.players.map((p: any) => (
-                                <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-slate-800 last:border-0">
+                                <li key={p.id} className="flex justify-between items-center text-[10px] font-bold py-1.5 border-b border-[#3d135e]/50 last:border-0">
                                   {editingPlayer?.id === p.id ? (
-                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-black text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none font-black" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-black px-3 py-1.5 rounded font-black text-[9px] uppercase font-black">Ok</button></div>
+                                    <div className="flex-1 flex gap-1"><input value={editingPlayer?.name || ''} onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)} className="bg-[#090214] text-white p-1.5 rounded w-full text-[10px] uppercase border border-cyan-500 outline-none font-black shadow-[0_0_5px_rgba(6,182,212,0.3)]" autoFocus /><button onClick={saveEditPlayer} className="bg-cyan-500 text-[#090214] px-3 py-1.5 rounded font-black text-[9px] uppercase shadow-[0_0_8px_rgba(6,182,212,0.5)]">Ok</button></div>
                                   ) : (
-                                    <><span className="uppercase text-slate-300">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-slate-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-slate-500 hover:text-pink-500 transition-colors">❌</button></div></>
+                                    <><span className="uppercase text-purple-200">{p.name}</span><div className="flex gap-4"><button onClick={() => setEditingPlayer({id: p.id, name: p.name})} className="text-purple-500 hover:text-cyan-400 transition-colors">✏️</button><button onClick={() => deletePlayer(p.id)} className="text-purple-500 hover:text-pink-500 transition-colors drop-shadow-[0_0_3px_rgba(236,72,153,0.5)]">❌</button></div></>
                                   )}
                                 </li>
                               ))}
                             </ul>
                             <div className="flex gap-1.5 pt-2">
-                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-black text-white p-2 rounded text-[10px] outline-none uppercase border border-slate-800 focus:border-orange-500 font-black tracking-tighter" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
-                              <button onClick={() => addPlayer(team.id)} className="bg-orange-500 text-black font-black px-4 rounded text-[10px] uppercase tracking-tighter shadow-md">Aggiungi</button>
+                              <input placeholder="Nuovo Giocatore" className="flex-1 bg-[#110524] text-white p-2 rounded text-[10px] outline-none uppercase border border-[#3d135e] focus:border-yellow-400 focus:shadow-[0_0_5px_rgba(250,204,21,0.3)] font-black tracking-tighter transition-all" value={playerForms[team.id]?.name || ''} onChange={(e) => setPlayerForms({...playerForms, [team.id]: { name: e.target.value }})} />
+                              <button onClick={() => addPlayer(team.id)} className="bg-yellow-400 text-[#090214] font-black px-4 rounded text-[10px] uppercase tracking-tighter shadow-[0_0_8px_rgba(250,204,21,0.5)]">Add</button>
                             </div>
                           </div>
                         </details>
@@ -891,20 +895,20 @@ export default function Home() {
             {/* PLAYOFF GENERATOR ADMIN */}
             {activeAdminSubTab === 'playoff' && (
               <div className="space-y-6 pb-20">
-                <div className="bg-slate-900 border-2 border-pink-500 rounded-xl p-6 text-center shadow-[4px_4px_0px_0px_rgba(236,72,153,1)]">
-                  <h3 className="text-pink-500 font-black uppercase tracking-widest mb-2 italic">Motore Tabellone</h3>
-                  <p className="text-slate-400 text-xs font-bold mb-6">Assicurati che i gironi siano conclusi. Scegli lo schema degli incroci e genera le fasi finali.</p>
+                <div className="bg-[#110524]/80 backdrop-blur-md border border-pink-500 rounded-xl p-6 text-center shadow-[0_0_20px_rgba(236,72,153,0.3)]">
+                  <h3 className="text-pink-400 font-black uppercase tracking-widest mb-2 italic drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">Motore Tabellone</h3>
+                  <p className="text-purple-300 text-xs font-bold mb-6">Assicurati che i gironi siano conclusi. Scegli lo schema degli incroci e genera le fasi finali.</p>
                   
                   <div className="mb-6 text-left">
-                    <label className="text-[10px] font-black uppercase text-slate-500 block mb-2 tracking-widest">Incroci Ottavi</label>
-                    <select value={playoffScheme} onChange={(e) => setPlayoffScheme(e.target.value)} className="bg-black text-white p-3 rounded-lg w-full border border-slate-800 text-sm font-black outline-none focus:border-pink-500">
+                    <label className="text-[10px] font-black uppercase text-purple-400 block mb-2 tracking-widest">Incroci Ottavi</label>
+                    <select value={playoffScheme} onChange={(e) => setPlayoffScheme(e.target.value)} className="bg-[#090214] text-white p-3 rounded-lg w-full border border-pink-500/50 text-sm font-black outline-none focus:border-pink-500 focus:shadow-[0_0_10px_rgba(236,72,153,0.3)] transition-all">
                       <option value="AB_CD">Girone A vs B  |  Girone C vs D</option>
                       <option value="AC_BD">Girone A vs C  |  Girone B vs D</option>
                       <option value="AD_BC">Girone A vs D  |  Girone B vs C</option>
                     </select>
                   </div>
                   
-                  <button onClick={generateBracket} className="bg-pink-500 text-white font-black uppercase text-sm px-6 py-4 rounded-xl w-full tracking-widest active:scale-95 transition-all shadow-md">
+                  <button onClick={generateBracket} className="bg-gradient-to-r from-pink-600 to-purple-600 text-white font-black uppercase text-sm px-6 py-4 rounded-xl w-full tracking-widest active:scale-95 transition-all shadow-[0_0_15px_rgba(236,72,153,0.5)] hover:shadow-[0_0_20px_rgba(236,72,153,0.8)]">
                     Genera Tabellone ⚡
                   </button>
                 </div>
@@ -914,29 +918,28 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 4 O 5) --- */}
-      <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[200]">
+      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 4 O 5) CON NEON GLOW --- */}
+      <nav className="fixed bottom-0 left-0 w-full bg-[#090214]/90 backdrop-blur-xl border-t border-cyan-500/50 shadow-[0_-5px_25px_rgba(6,182,212,0.2)] z-[200]">
         <div className={`grid ${isAdminUnlocked ? 'grid-cols-5' : 'grid-cols-4'} max-w-md mx-auto px-1 pt-2 pb-6`}>
-          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
           </button>
-          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button onClick={() => setActiveTab('gironi')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'gironi' ? 'text-cyan-400 -translate-y-1 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">📊</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Gironi</span>
           </button>
-          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-orange-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-yellow-400 -translate-y-1 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">📅</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Orari</span>
           </button>
-          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+          <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
           </button>
           
-          {/* Mostra il tab Admin solo se sei loggato tramite l'Easter Egg */}
           {isAdminUnlocked && (
-            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
+            <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1 drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
               <span className="text-xl sm:text-2xl">⚙️</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Admin</span>
             </button>
@@ -944,43 +947,43 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* --- MODALE ALERTS / CONFERME (Z-INDEX 300) --- */}
+      {/* --- MODALE ALERTS / CONFERME --- */}
       {modal.isOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-            <h3 className="text-2xl font-black uppercase mb-2 text-white italic">{modal.title}</h3>
-            <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight">{modal.message}</p>
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[#090214]/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-[#110524] border-2 border-yellow-400 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_30px_rgba(250,204,21,0.3)]">
+            <h3 className="text-2xl font-black uppercase mb-2 text-white italic drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">{modal.title}</h3>
+            <p className="text-purple-200 font-bold mb-8 text-sm leading-tight uppercase tracking-tight">{modal.message}</p>
             <div className="flex justify-end gap-3">
-              {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest">Annulla</button>}
-              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg active:scale-95">Conferma</button>
+              {modal.type === 'confirm' && <button onClick={closeModal} className="bg-[#1a0833] border border-[#3d135e] text-purple-300 px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest hover:bg-[#260c49] transition-all">Annulla</button>}
+              <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-yellow-400 text-[#090214] px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-[0_0_10px_rgba(250,204,21,0.6)] active:scale-95 transition-all">Conferma</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODALE SEGRETA ADMIN (EASTER EGG, Z-INDEX 400) --- */}
+      {/* --- MODALE SEGRETA ADMIN (EASTER EGG) --- */}
       {isSecretLoginOpen && !user && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] relative">
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-[#090214]/95 backdrop-blur-xl p-4 animate-fade-in">
+          <div className="bg-[#110524] border border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[0_0_40px_rgba(6,182,212,0.4)] relative">
             
-            <button onClick={() => setIsSecretLoginOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white font-black text-xl">✕</button>
+            <button onClick={() => setIsSecretLoginOpen(false)} className="absolute top-4 right-4 text-cyan-500/50 hover:text-cyan-400 font-black text-xl drop-shadow-[0_0_5px_rgba(6,182,212,0.8)] transition-all">✕</button>
 
-            <div className="mb-8 text-center">
-              <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2 text-2xl">Area Staff</h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Accesso riservato al tavolo giuria.</p>
+            <div className="mb-8 text-center mt-2">
+              <h3 className="font-black uppercase italic tracking-widest mb-2 text-2xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-500 drop-shadow-[0_0_5px_rgba(6,182,212,0.5)]">Area Staff</h3>
+              <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest drop-shadow-[0_0_3px_rgba(236,72,153,0.5)]">Accesso riservato al tavolo giuria.</p>
             </div>
 
-            <div className="space-y-4 mb-6">
-              <input type="email" placeholder="Email Staff" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+            <div className="space-y-4 mb-8">
+              <input type="email" placeholder="Email Staff" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-[#090214] text-cyan-300 p-4 rounded-xl border border-cyan-900 text-sm outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(6,182,212,0.3)] font-mono transition-all" />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-[#090214] text-cyan-300 p-4 rounded-xl border border-cyan-900 text-sm outline-none focus:border-cyan-500 focus:shadow-[0_0_10px_rgba(6,182,212,0.3)] font-mono transition-all" />
             </div>
 
             <button 
               onClick={handleAuthAction} 
               disabled={isAuthLoading} 
-              className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}
+              className={`w-full py-4 rounded-xl font-black uppercase text-xs tracking-widest transition-all ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-[#1a0833] text-purple-500' : 'bg-cyan-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.6)] hover:shadow-[0_0_25px_rgba(6,182,212,0.8)] active:scale-95'}`}
             >
-              {isAuthLoading ? 'Verifica in corso...' : 'Sblocca Controlli'}
+              {isAuthLoading ? 'Verifica...' : 'Sblocca Controlli'}
             </button>
           </div>
         </div>
