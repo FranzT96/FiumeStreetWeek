@@ -27,17 +27,17 @@ export default function Home() {
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
 
-  // --- STATI PER AUTH (AGGIORNATI PER OTP) ---
+  // --- STATI PER AUTH (EASTER EGG) ---
   const [user, setUser] = useState<any | null>(null);
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'reset_request' | 'reset_verify'>('login');
-  
   const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [regName, setRegName] = useState('');
-  const [otpCode, setOtpCode] = useState(''); 
+
+  // --- STATI PER EASTER EGG ADMIN ---
+  const [isSecretLoginOpen, setIsSecretLoginOpen] = useState(false);
+  const pressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
 
@@ -53,13 +53,6 @@ export default function Home() {
     { id: 'd5', match_time: '19:40', court: 'A', status: 'programmata', is_event: false },
     { id: 'd6', match_time: '19:40', court: 'B', status: 'programmata', is_event: false },
   ];
-
-  const extractNameFromEmail = (userEmail: string) => {
-    if (!userEmail) return 'Anonimo';
-    const namePart = userEmail.split('@')[0];
-    const cleanName = namePart.replace(/[._-]/g, ' ');
-    return cleanName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-  };
 
   const checkSession = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -91,7 +84,6 @@ export default function Home() {
         setUser(session?.user || null);
         setIsAdminUnlocked(session?.user?.email === ADMIN_EMAIL);
         fetchData();
-        setActiveTab('home');
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsAdminUnlocked(false);
@@ -115,106 +107,39 @@ export default function Home() {
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
 
-  // --- LOGICA AUTH CON SISTEMA OTP ---
+  // --- LOGICA EASTER EGG (LONG PRESS 3 SECONDI) ---
+  const handlePointerDown = () => {
+    pressTimer.current = setTimeout(() => {
+      setIsSecretLoginOpen(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 3000);
+  };
+
+  const handlePointerUpOrLeave = () => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  };
+
+  // --- LOGICA AUTH ADMIN ---
   const handleAuthAction = async () => {
     setIsAuthLoading(true);
 
-    // FASE 1: Richiesta del codice OTP via email
-    if (authMode === 'reset_request') {
-      if (!email) {
-        showAlert("Dati mancanti", "Inserisci la tua email per recuperare la password.");
-        setIsAuthLoading(false);
-        return;
-      }
-      
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-
-      if (error) {
-        showAlert("Errore", "Impossibile inviare il codice. Controlla l'email.");
-      } else {
-        setAuthMode('reset_verify'); // Passiamo alla fase di verifica codice
-        showAlert("Codice Inviato!", "Controlla la tua casella di posta per il codice segreto.");
-      }
-      setIsAuthLoading(false);
-      return;
-    }
-
-    // FASE 2: Verifica codice OTP e salvataggio nuova password
-    if (authMode === 'reset_verify') {
-      if (!otpCode || !password) {
-        showAlert("Dati mancanti", "Inserisci il codice ricevuto e la nuova password.");
-        setIsAuthLoading(false);
-        return;
-      }
-
-      // Verifichiamo l'OTP
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token: otpCode,
-        type: 'recovery'
-      });
-
-      if (verifyError) {
-        setIsAuthLoading(false);
-        showAlert("Errore Codice", "Il codice inserito non è valido o è scaduto.");
-        return;
-      }
-
-      // Se il codice è corretto, Supabase ha creato una sessione temporanea. Cambiamo la password:
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      
-      setIsAuthLoading(false);
-
-      if (updateError) {
-        showAlert("Errore", "Impossibile aggiornare la password: " + updateError.message);
-      } else {
-        setOtpCode('');
-        setPassword('');
-        showAlert("Successo! 🚀", "La tua password è stata aggiornata. Ora sei loggato e pronto.");
-        fetchData();
-        setActiveTab('home');
-      }
-      return;
-    }
-
-    // FASE LOGIN / REGISTRAZIONE
     if (!email || !password) {
-      showAlert("Dati mancanti", "Inserisci email e password.");
+      showAlert("Dati mancanti", "Inserisci email e password dello staff.");
       setIsAuthLoading(false);
       return;
     }
     
-    if (authMode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        showAlert("Errore Login", "Credenziali non valide o account non confermato."); 
-      } else {
-        setEmail(''); setPassword('');
-      }
-    } else if (authMode === 'register') {
-      if (!regName) {
-        showAlert("Dati mancanti", "Inserisci il tuo Nome e Cognome per registrarti.");
-        setIsAuthLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: { data: { full_name: regName } }
-      });
-
-      if (error) {
-        showAlert("Errore Registrazione", error.message);
-      } else {
-        setEmail(''); setPassword(''); setRegName('');
-        
-        if (data.user && !data.session) {
-          showAlert("ATTENZIONE", "Devi disattivare 'Confirm email' su Supabase > Authentication > Providers > Email per permettere l'accesso diretto.");
-        } else {
-          showAlert("Fiume Street Week", "Benvenuto alla Fiume Street Week 2026");
-        }
-      }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      showAlert("Accesso Negato", "Credenziali non valide."); 
+    } else {
+      setEmail(''); 
+      setPassword('');
+      setIsSecretLoginOpen(false);
+      setActiveTab('admin'); // Porta l'admin direttamente al pannello
     }
     setIsAuthLoading(false);
   };
@@ -224,15 +149,16 @@ export default function Home() {
     await supabase.auth.signOut();
     setUser(null);
     setIsAdminUnlocked(false);
-    setEmail(''); setPassword(''); setRegName(''); setOtpCode('');
+    setEmail(''); 
+    setPassword('');
     setActiveTab('home');
   };
 
   const promptLogout = () => {
     setModal({
       isOpen: true,
-      title: "Logout",
-      message: "Sei sicuro di voler uscire dal tuo account?",
+      title: "Logout Staff",
+      message: "Sei sicuro di voler scollegare il pannello di controllo?",
       type: 'confirm',
       onConfirm: performLogout
     });
@@ -485,113 +411,10 @@ export default function Home() {
     setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
-  if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
-
-  // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET (TUTTO TRAMITE APP) ---
-  if (!user) {
-    return (
-      <main className="min-h-screen bg-[#0f172a] p-4 flex items-center justify-center font-sans">
-        <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] animate-fade-in relative overflow-hidden">
-          
-          <div className="flex justify-center mb-8">
-            <img src="/icon.png" alt="FSW Logo" className="w-40 h-auto drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] object-contain" />
-          </div>
-          
-          {/* TAB SUPERIORI (Nascondi se stiamo in reset) */}
-          {(authMode === 'login' || authMode === 'register') && (
-            <div className="flex gap-2 mb-6">
-              <button onClick={() => { setAuthMode('login'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'login' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Accedi</button>
-              <button onClick={() => { setAuthMode('register'); }} className={`flex-1 py-3 rounded-lg font-black uppercase text-[10px] tracking-widest transition-colors ${authMode === 'register' ? 'bg-pink-500 text-white shadow-md' : 'text-slate-500 bg-slate-800/50 hover:bg-slate-800'}`}>Registrati</button>
-            </div>
-          )}
-
-          {/* INTESTAZIONI RESET */}
-          {authMode === 'reset_request' && (
-            <div className="mb-6 text-center">
-              <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2">Recupera Password</h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Inserisci la tua email per ricevere il codice segreto.</p>
-            </div>
-          )}
-          {authMode === 'reset_verify' && (
-            <div className="mb-6 text-center">
-              <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2">Inserisci Codice</h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Abbiamo inviato il codice alla tua email.</p>
-            </div>
-          )}
-
-          {/* CAMPI INPUT */}
-          <div className="space-y-4 mb-6">
-            
-            {/* Campo Email usato in Login, Register e Reset_Request */}
-            {authMode !== 'reset_verify' && (
-              <input type="email" placeholder="Indirizzo Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
-            )}
-            
-            {/* Input OTP a 8 caratteri */}
-            {authMode === 'reset_verify' && (
-              <input type="text" placeholder="ES. 12345678" maxLength={8} value={otpCode} onChange={(e) => setOtpCode(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-center text-xl tracking-widest outline-none focus:border-cyan-500 font-mono transition-colors uppercase" />
-            )}
-
-            {/* Campo Password: Usato nel login, register e nel reset_verify (per la nuova) */}
-            {(authMode === 'login' || authMode === 'register' || authMode === 'reset_verify') && (
-              <input type="password" placeholder={authMode === 'reset_verify' ? "Scrivi Nuova Password" : "Password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
-            )}
-            
-            {authMode === 'login' && (
-              <div className="text-right">
-                <button onClick={() => setAuthMode('reset_request')} className="text-slate-500 hover:text-cyan-400 text-[10px] font-black uppercase tracking-widest transition-colors">Password dimenticata?</button>
-              </div>
-            )}
-
-            {authMode === 'register' && (
-              <div className="space-y-4 pt-2 border-t border-slate-800 mt-2">
-                <div>
-                  <label className="text-[9px] font-black uppercase text-cyan-500 tracking-widest block mb-1">Nome e Cognome</label>
-                  <input type="text" placeholder="Mario Rossi" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-xs outline-none focus:border-cyan-500 uppercase font-black" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <button 
-              onClick={handleAuthAction} 
-              disabled={isAuthLoading} 
-              className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : authMode === 'login' || authMode === 'reset_verify' ? 'bg-cyan-500 text-slate-900 active:scale-95' : authMode === 'register' ? 'bg-pink-500 text-white active:scale-95' : 'bg-orange-500 text-slate-900 active:scale-95'}`}
-            >
-              {isAuthLoading ? 'Caricamento...' : 
-               authMode === 'login' ? 'Entra nel Torneo' : 
-               authMode === 'register' ? 'Crea Account' : 
-               authMode === 'reset_request' ? 'Invia Codice' : 'Aggiorna e Accedi'}
-            </button>
-            
-            {(authMode === 'reset_request' || authMode === 'reset_verify') && (
-              <button onClick={() => { setAuthMode('login'); setOtpCode(''); }} className="text-slate-500 py-2 font-black uppercase text-[10px] tracking-widest w-full hover:text-white transition-colors">Torna al Login</button>
-            )}
-          </div>
-        </div>
-
-        {/* MODALE ALERTS PER LA SCHERMATA LOGIN */}
-        {modal.isOpen && (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-slate-900 border-4 border-orange-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(249,115,22,1)]">
-              <h3 className="text-2xl font-black uppercase mb-2 text-white italic tracking-tighter tracking-widest">{modal.title}</h3>
-              <p className="text-slate-300 font-bold mb-8 text-sm leading-tight uppercase tracking-tight tracking-widest">{modal.message}</p>
-              <div className="flex justify-end gap-3">
-                {modal.type === 'confirm' && (
-                  <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest font-black hover:bg-slate-700 transition-colors">Annulla</button>
-                )}
-                <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg tracking-widest active:scale-95">Conferma</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    );
+  // --- LOADING INIZIALE ---
+  if (loading || authChecking) {
+    return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
   }
-
-  // --- APP PRINCIPALE LOGGATA ---
-  if (loading) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Sincronizzazione Dati...</div>;
 
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
   const nextGames = sortedGames.filter(g => g.status === 'programmata').slice(0, 2);
@@ -606,9 +429,19 @@ export default function Home() {
     <main className="min-h-screen bg-[#0f172a] p-3 md:p-8 font-sans text-slate-200 pb-28 select-none">
       <div className="max-w-6xl mx-auto space-y-8">
         
+        {/* --- LOGO CON EASTER EGG (3 SECONDI) --- */}
         {activeTab === 'home' && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in">
-            <img src="/icon.png" alt="Fiume Street Week Logo" className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain" onContextMenu={(e) => e.preventDefault()} style={{ WebkitTouchCallout: 'none', userSelect: 'none' }} />
+            <img 
+              src="/icon.png" 
+              alt="Fiume Street Week Logo" 
+              className="w-56 md:w-80 h-auto drop-shadow-[0_0_15px_rgba(236,72,153,0.4)] object-contain cursor-pointer" 
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUpOrLeave}
+              onPointerLeave={handlePointerUpOrLeave}
+              onContextMenu={(e) => e.preventDefault()} 
+              style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }} 
+            />
           </div>
         )}
 
@@ -848,7 +681,7 @@ export default function Home() {
                         <span className="text-sm">🗑️</span> Azzera Torneo
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); setIsAdminMenuOpen(false); setTimeout(() => promptLogout(), 100); }} className="w-full text-left px-4 py-3 text-[10px] font-black uppercase text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-3 transition-colors relative z-10">
-                        <span className="text-sm">🚪</span> Logout
+                        <span className="text-sm">🚪</span> Esci dal Pannello
                       </button>
                     </div>
                   </>
@@ -1082,9 +915,9 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 5) --- */}
+      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 4 O 5) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[200]">
-        <div className="grid grid-cols-5 max-w-md mx-auto px-1 pt-2 pb-6">
+        <div className={`grid ${isAdminUnlocked ? 'grid-cols-5' : 'grid-cols-4'} max-w-md mx-auto px-1 pt-2 pb-6`}>
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
@@ -1101,15 +934,12 @@ export default function Home() {
             <span className="text-xl sm:text-2xl">🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
           </button>
-          {isAdminUnlocked ? (
+          
+          {/* Mostra il tab Admin solo se sei loggato tramite l'Easter Egg */}
+          {isAdminUnlocked && (
             <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
               <span className="text-xl sm:text-2xl">⚙️</span>
               <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Admin</span>
-            </button>
-          ) : (
-            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); promptLogout(); }} className="flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition-all duration-200 active:scale-95 touch-manipulation relative z-[210]">
-              <span className="text-xl sm:text-2xl">🚪</span>
-              <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Esci</span>
             </button>
           )}
         </div>
@@ -1125,6 +955,34 @@ export default function Home() {
               {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest">Annulla</button>}
               <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg active:scale-95">Conferma</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODALE SEGRETA ADMIN (EASTER EGG, Z-INDEX 400) --- */}
+      {isSecretLoginOpen && !user && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-slate-900 border-4 border-cyan-500 rounded-3xl p-8 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(6,182,212,1)] relative">
+            
+            <button onClick={() => setIsSecretLoginOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white font-black text-xl">✕</button>
+
+            <div className="mb-8 text-center">
+              <h3 className="text-cyan-400 font-black uppercase italic tracking-widest mb-2 text-2xl">Area Staff</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Accesso riservato al tavolo giuria.</p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <input type="email" placeholder="Email Staff" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black text-white p-4 rounded-xl border border-slate-800 text-sm outline-none focus:border-cyan-500 font-mono transition-colors" />
+            </div>
+
+            <button 
+              onClick={handleAuthAction} 
+              disabled={isAuthLoading} 
+              className={`w-full py-4 rounded-xl font-black uppercase text-xs shadow-lg tracking-widest transition-transform ${isAuthLoading ? 'opacity-50 cursor-not-allowed bg-slate-700 text-white' : 'bg-cyan-500 text-slate-900 active:scale-95'}`}
+            >
+              {isAuthLoading ? 'Verifica in corso...' : 'Sblocca Controlli'}
+            </button>
           </div>
         </div>
       )}
