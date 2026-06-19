@@ -665,12 +665,12 @@ export default function Home() {
             )}
           </section>
         )}
-{/* --- SOCIAL HUB PUBBLICO --- */}
+{/* --- SOCIAL PUBBLICO --- */}
         {activeTab === 'social' && (
           <section className="animate-fade-in pt-4 relative z-10 space-y-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-black uppercase italic tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">
-                Social Hub
+            <div className="mb-6 border-b-2 border-[#3d135e] pb-2">
+              <h2 className="text-2xl font-black uppercase italic tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-500 drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]">
+                SOCIAL
               </h2>
               <p className="text-purple-300 text-[10px] font-bold uppercase tracking-widest mt-1">
                 Resta connesso con il mondo FSW 2026
@@ -678,10 +678,10 @@ export default function Home() {
             </div>
 
             {/* CARD 1: INSTAGRAM */}
-            <div className="bg-[#110524]/80 backdrop-blur-md border border-pink-500/50 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-5 shadow-[0_0_20px_rgba(236,72,153,0.2)] hover:shadow-[0_0_25px_rgba(236,72,153,0.4)] transition-all">
-              <div className="bg-[#1a0833] p-4 rounded-2xl border border-[#3d135e] shadow-[0_0_10px_rgba(236,72,153,0.3)]">
-                {/* SVG Icona Instagram */}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 text-pink-500 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">
+            <div className="bg-[#110524]/80 backdrop-blur-md border-2 border-cyan-500/50 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-5 shadow-[0_0_20px_rgba(6,182,212,0.2)] hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] transition-all">
+              <div className="bg-[#090214] p-4 rounded-2xl border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                {/* SVG Icona Instagram (Giallo Neon) */}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]">
                   <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
                   <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
                   <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
@@ -689,37 +689,29 @@ export default function Home() {
               </div>
               <div className="flex-1 text-center sm:text-left">
                 <h3 className="text-white font-black uppercase text-lg tracking-widest drop-shadow-[0_0_5px_rgba(255,255,255,0.4)]">Instagram</h3>
-                <p className="text-cyan-400 font-mono text-[10px] mb-1">@tuo_profilo_ig</p>
-                <p className="text-purple-400 text-[9px] font-bold uppercase tracking-wide">Foto, Reel e Storie live dal playground</p>
+                <p className="text-pink-400 font-mono text-[11px] font-bold mt-1 drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">@fiumestreetweek</p>
               </div>
               <a 
-                href="https://instagram.com/tuo_profilo_ig" 
+                href="https://www.instagram.com/fiumestreetweek?igsh=anFlMG41N3MxcjZr&utm_source=qr" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="w-full sm:w-auto bg-pink-600 hover:bg-pink-500 text-white font-black uppercase text-[10px] px-6 py-3 rounded-xl tracking-widest shadow-[0_0_15px_rgba(236,72,153,0.5)] transition-all active:scale-95 text-center mt-2 sm:mt-0"
+                className="w-full sm:w-auto bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-300 hover:to-orange-400 text-[#090214] font-black uppercase text-[10px] px-6 py-3 rounded-xl tracking-widest shadow-[0_0_15px_rgba(250,204,21,0.5)] transition-all active:scale-95 text-center mt-2 sm:mt-0"
               >
                 Apri ➔
               </a>
             </div>
 
             {/* CARD 2: HASHTAG / COMMUNITY */}
-            <div className="bg-[#090214]/60 backdrop-blur-sm border border-cyan-500/30 rounded-2xl p-5 text-center shadow-[0_0_15px_rgba(6,182,212,0.1)]">
-              <span className="text-3xl block mb-2 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]">📸</span>
-              <h3 className="text-cyan-400 font-black uppercase text-sm tracking-widest mb-2 drop-shadow-[0_0_5px_rgba(6,182,212,0.5)]">Condividi il tuo torneo</h3>
-              <p className="text-purple-300 text-[10px] uppercase font-bold leading-relaxed px-4">
-                Usa l'hashtag <span className="text-yellow-400 font-black drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">#FSW2026</span> nelle tue storie e post. Le foto e i video più spettacolari verranno ripostati sul nostro profilo ufficiale!
-              </p>
-            </div>
-
-            {/* CARD 3: ASSISTENZA / STAFF */}
-            <div className="bg-[#1a0833]/40 border border-[#3d135e] rounded-2xl p-5 text-center mt-8">
-              <h4 className="text-purple-400 font-black uppercase text-[10px] tracking-widest mb-1">Problemi o segnalazioni?</h4>
-              <p className="text-purple-500/70 text-[9px] font-bold uppercase tracking-wide">
-                Rivolgiti direttamente allo staff al tavolo giuria.
+            <div className="bg-[#090214]/60 backdrop-blur-sm border border-purple-500/50 rounded-2xl p-5 text-center shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+              <span className="text-3xl block mb-2 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">📸</span>
+              <h3 className="text-pink-400 font-black uppercase text-sm tracking-widest mb-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">Condividi il tuo torneo</h3>
+              <p className="text-purple-200 text-[10px] uppercase font-bold leading-relaxed px-4">
+                Usa l'hashtag <span className="text-cyan-400 font-black drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">#FSW2026</span> nelle tue storie e post. Le foto e i video più spettacolari verranno ripostati sul nostro profilo ufficiale!
               </p>
             </div>
           </section>
         )}
+
         {/* --- ADMIN AREA --- */}
         {activeTab === 'admin' && isAdminUnlocked && (
           <section className="animate-fade-in space-y-6 relative z-10">
