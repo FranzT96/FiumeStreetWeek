@@ -13,13 +13,10 @@ export default function Home() {
   
   const [teams, setTeams] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
-  const [shopItems, setShopItems] = useState<any[]>([]);
-  const [bids, setBids] = useState<any[]>([]);
   
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
   const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
-  const [activeShopTab, setActiveShopTab] = useState('canotte'); 
   
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
   const [playerForms, setPlayerForms] = useState<Record<number, { name: string }>>({});
@@ -29,15 +26,6 @@ export default function Home() {
   const [gameToEdit, setGameToEdit] = useState<any | null>(null);
   const [isNewGameModalOpen, setIsNewGameModalOpen] = useState(false);
   const [modal, setModal] = useState<{ isOpen: boolean; title: string; message: string; type: 'alert' | 'confirm'; onConfirm?: () => void; }>({ isOpen: false, title: '', message: '', type: 'alert' });
-
-  // --- ASTE STATE ---
-  const [isBidModalOpen, setIsBidModalOpen] = useState(false);
-  const [selectedBidItem, setSelectedBidItem] = useState<any | null>(null);
-  const [bidForm, setBidForm] = useState({ amount: '' }); 
-  const [openedEnvelopes, setOpenedEnvelopes] = useState<Record<number, boolean>>({});
-  const [bidError, setBidError] = useState<string | null>(null); 
-  const [isSubmittingBid, setIsSubmittingBid] = useState(false);
-  const [currentImageIndexes, setCurrentImageIndexes] = useState<Record<number | string, number>>({});
 
   // --- STATI PER AUTH (AGGIORNATI PER OTP) ---
   const [user, setUser] = useState<any | null>(null);
@@ -66,14 +54,6 @@ export default function Home() {
     { id: 'd6', match_time: '19:40', court: 'B', status: 'programmata', is_event: false },
   ];
 
-  const dummyShopItems = [
-    { id: 's1', name: 'Canotta FSW Nera', type: 'canotte', base_price: 25, image_url: '/shop/Nera.png' },
-    { id: 's2', name: 'Canotta FSW Bianca', type: 'canotte', base_price: 25, image_url: '/shop/Bianca.png' },
-    { id: 's3', name: 'Canotta Iverson - Limited', type: 'limited', base_price: 15, image_url: '/shop/Iverson.png' },
-    { id: 's4', name: 'Canotta Rodman - Limited', type: 'limited', base_price: 15, image_url: '/shop/Rodman.png' },
-    { id: 's5', name: 'Canotta Curry - Limited', type: 'limited', base_price: 15, image_url: '/shop/Curry.png' }
-  ];
-
   const extractNameFromEmail = (userEmail: string) => {
     if (!userEmail) return 'Anonimo';
     const namePart = userEmail.split('@')[0];
@@ -96,22 +76,9 @@ export default function Home() {
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
-    const { data: shopData, error: shopError } = await supabase.from('shop_items').select('*');
     
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session && session.user.email === ADMIN_EMAIL) {
-      const { data: bidsData } = await supabase.from('bids').select('*').order('amount', { ascending: false }).order('created_at', { ascending: true }); 
-      if (bidsData) setBids(bidsData);
-    }
-
     if (teamsData) setTeams(teamsData);
     if (gamesData) setGames(gamesData);
-    
-    if (!shopError && shopData && shopData.length > 0) {
-      setShopItems(shopData);
-    } else {
-      setShopItems(dummyShopItems); 
-    }
 
     setLoading(false);
   };
@@ -518,72 +485,6 @@ export default function Home() {
     setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
-  const nextImage = (e: React.MouseEvent, itemId: string | number, max: number) => { e.stopPropagation(); setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) + 1) % max})); };
-  const prevImage = (e: React.MouseEvent, itemId: string | number, max: number) => { e.stopPropagation(); setCurrentImageIndexes(prev => ({...prev, [itemId]: ((prev[itemId] || 0) - 1 + max) % max})); };
-
-  const submitBid = async () => {
-    setBidError(null); 
-
-    if (!bidForm.amount) {
-      setBidError("Inserisci una cifra per l'offerta.");
-      return;
-    }
-    
-    const amountNum = parseFloat(bidForm.amount.replace(',', '.'));
-    
-    if (isNaN(amountNum) || amountNum < selectedBidItem.base_price) {
-      setBidError(`L'offerta deve essere maggiore o uguale a €${selectedBidItem.base_price}`);
-      return;
-    }
-
-    if (typeof selectedBidItem.id === 'string') {
-      setBidError("Articolo di prova. Sostituisci i dati fittizi col DB per testare.");
-      return;
-    }
-
-    const userEmail = user?.email || '';
-    const userName = user?.user_metadata?.full_name || extractNameFromEmail(userEmail);
-    const newTimestamp = new Date().toISOString();
-
-    setIsSubmittingBid(true);
-
-    const { data: existingBids } = await supabase.from('bids')
-      .select('id')
-      .eq('item_id', selectedBidItem.id)
-      .eq('contact_info', userEmail);
-
-    let error = null;
-
-    if (existingBids && existingBids.length > 0) {
-      const { error: updateError } = await supabase.from('bids')
-        .update({ amount: amountNum, bidder_name: userName, created_at: newTimestamp })
-        .eq('id', existingBids[0].id);
-      error = updateError;
-    } else {
-      const { error: insertError } = await supabase.from('bids').insert({
-        item_id: selectedBidItem.id,
-        bidder_name: userName,
-        contact_info: userEmail, 
-        amount: amountNum,
-        created_at: newTimestamp
-      });
-      error = insertError;
-    }
-
-    setIsSubmittingBid(false);
-
-    if (error) {
-      console.error(error);
-      setBidError("Errore di connessione. Riprova tra poco.");
-    } else {
-      setIsBidModalOpen(false);
-      setBidForm({ amount: '' });
-      setBidError(null);
-      showAlert("Offerta Inviata! 🚀", "La tua offerta in busta chiusa è stata registrata e aggiornata.");
-      fetchData(); 
-    }
-  };
-
   if (authChecking) return <div className="min-h-screen bg-[#0f172a] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
 
   // --- SCHERMATA MURO DI LOGIN / REGISTRAZIONE / RESET (TUTTO TRAMITE APP) ---
@@ -779,74 +680,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- SHOP TAB --- */}
-        {activeTab === 'shop' && (
-          <section className="animate-fade-in space-y-6 pt-4">
-            <h2 className="text-xl font-black text-purple-500 uppercase flex items-center gap-2 border-b-2 border-slate-800 pb-2 italic mb-4">
-              🛍️ Merchandising
-            </h2>
-
-            <div className="flex gap-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-              <button onClick={() => setActiveShopTab('canotte')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest ${activeShopTab === 'canotte' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>Canotte</button>
-              <button onClick={() => setActiveShopTab('limited')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest ${activeShopTab === 'limited' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>Limited Edition</button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {shopItems.filter(i => i.type === activeShopTab).length === 0 ? (
-                <div className="col-span-full p-8 text-center text-slate-500 font-black uppercase tracking-widest text-[10px] bg-slate-900/50 rounded-xl border border-slate-800">Nessun articolo al momento.</div>
-              ) : (
-                shopItems.filter(i => i.type === activeShopTab).map((item) => {
-                  const images = item.image_url ? item.image_url.split(',').map((u: string) => u.trim()) : [];
-                  const imgIdx = currentImageIndexes[item.id] || 0;
-                  const currentImage = images[imgIdx] || 'https://via.placeholder.com/400x500/0f172a/06b6d4?text=FOTO+NON+DISPONIBILE';
-
-                  return (
-                    <div key={item.id} className={`bg-slate-900 rounded-2xl overflow-hidden border-2 shadow-xl flex flex-col ${item.type === 'limited' ? 'border-pink-500 shadow-[4px_4px_0px_0px_rgba(236,72,153,1)]' : 'border-cyan-500 shadow-[4px_4px_0px_0px_rgba(6,182,212,1)]'}`}>
-                      
-                      <div className="aspect-[2/3] bg-slate-800 relative group">
-                        <img src={currentImage} alt={`${item.name} - Foto ${imgIdx + 1}`} className="w-full h-full object-cover transition-opacity duration-300" />
-                        
-                        {item.type === 'limited' && (
-                          <div className="absolute top-2 right-2 bg-pink-600 text-white text-[9px] font-black uppercase px-2 py-1 rounded shadow-md animate-pulse z-10">Asta al Buio</div>
-                        )}
-
-                        {images.length > 1 && (
-                          <>
-                            <button onClick={(e) => prevImage(e, item.id, images.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm opacity-80 hover:opacity-100 transition-opacity active:scale-95">{'<'}</button>
-                            <button onClick={(e) => nextImage(e, item.id, images.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center font-black text-sm opacity-80 hover:opacity-100 transition-opacity active:scale-95">{'>'}</button>
-                            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/50 px-2 py-1 rounded-full">
-                              {images.map((_: string, idx: number) => (
-                                <div key={idx} className={`w-2 h-2 rounded-full transition-colors ${idx === imgIdx ? 'bg-pink-500' : 'bg-white/50'}`} />
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      <div className="p-4 flex flex-col flex-1 justify-between">
-                        <div>
-                          <h3 className="font-black uppercase text-white leading-tight mb-1 text-sm">{item.name}</h3>
-                          {item.type === 'limited' ? (
-                            <p className="text-pink-400 font-black text-xs italic tracking-widest mb-3">Prezzo base: €{item.base_price}</p>
-                          ) : (
-                            <p className="text-cyan-400 font-black text-sm mb-3">€{item.base_price}</p>
-                          )}
-                        </div>
-                        
-                        {item.type === 'limited' ? (
-                          <button onClick={() => { setSelectedBidItem(item); setIsBidModalOpen(true); setBidError(null); }} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg shadow-pink-500/20 mt-auto active:scale-95">Fai un'offerta 🤫</button>
-                        ) : (
-                          <button onClick={() => showAlert("Corri al Bar! 🍻", "Le canotte ufficiali FSW ti aspettano al bar dell'evento! Vai a sceglierla, provala e falla tua prima che finiscano le taglie.")} className="w-full bg-slate-800 hover:bg-slate-700 text-cyan-400 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-colors shadow-lg active:scale-95 mt-auto">Acquista al bar</button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </section>
-        )}
-
         {/* --- GIRONI TAB --- */}
         {activeTab === 'gironi' && (
           <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1028,7 +861,6 @@ export default function Home() {
               <button onClick={() => setActiveAdminSubTab('orari')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'orari' ? 'bg-cyan-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>📅 Orari</button>
               <button onClick={() => setActiveAdminSubTab('roster')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'roster' ? 'bg-orange-500 text-slate-900 shadow-md' : 'text-slate-500'}`}>🏀 Roster</button>
               <button onClick={() => setActiveAdminSubTab('playoff')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'playoff' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-500'}`}>🏆 Playoff</button>
-              <button onClick={() => setActiveAdminSubTab('aste')} className={`min-w-[70px] flex-1 py-2 rounded-lg font-black uppercase text-[10px] ${activeAdminSubTab === 'aste' ? 'bg-purple-500 text-white shadow-md' : 'text-slate-500'}`}>🎁 Aste</button>
             </div>
 
             {/* LIVE CONTROL */}
@@ -1246,61 +1078,13 @@ export default function Home() {
                 </div>
               </div>
             )}
-
-            {/* ADMIN ASTE VIEW */}
-            {activeAdminSubTab === 'aste' && (
-              <div className="space-y-6 pb-20">
-                <h3 className="text-purple-400 font-black uppercase tracking-widest italic border-b border-slate-800 pb-2">Buste Limited Edition</h3>
-                
-                {shopItems.filter(i => i.type === 'limited').map(item => (
-                  <div key={item.id} className="bg-slate-900 border-2 border-purple-500/50 rounded-xl overflow-hidden shadow-xl">
-                    <div className="p-4 flex justify-between items-center bg-slate-800/30">
-                      <div>
-                        <h4 className="font-black text-white uppercase text-sm">{item.name}</h4>
-                        <p className="text-[10px] text-slate-400 font-mono mt-1">Prezzo Base: €{item.base_price}</p>
-                      </div>
-                      <button 
-                        onClick={() => setOpenedEnvelopes(prev => ({...prev, [item.id]: !prev[item.id]}))}
-                        className={`px-4 py-2 rounded font-black uppercase text-[10px] tracking-widest transition-all ${openedEnvelopes[item.id] ? 'bg-slate-700 text-slate-300' : 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'}`}
-                      >
-                        {openedEnvelopes[item.id] ? 'Chiudi' : 'Apri Busta ✉️'}
-                      </button>
-                    </div>
-                    
-                    {openedEnvelopes[item.id] && (
-                      <div className="p-4 border-t border-slate-800 bg-black/40">
-                        {bids.filter(b => b.item_id === item.id).length === 0 ? (
-                          <p className="text-center text-slate-500 text-[10px] font-black uppercase tracking-widest py-4">Nessuna offerta registrata.</p>
-                        ) : (
-                          <ul className="space-y-2">
-                            {bids.filter(b => b.item_id === item.id).map((bid, idx) => (
-                              <li key={bid.id} className={`flex justify-between items-center p-3 rounded-lg border ${idx === 0 ? 'bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-pink-500 shadow-[2px_2px_0px_0px_rgba(236,72,153,1)]' : 'bg-slate-800/50 border-slate-700'}`}>
-                                <div className="flex flex-col">
-                                  <span className="font-black text-white uppercase text-xs">
-                                    {idx === 0 && '👑 '} {bid.bidder_name}
-                                  </span>
-                                  <span className="text-[9px] text-slate-400 font-mono mt-0.5">
-                                    {bid.contact_info} • {new Date(bid.created_at).toLocaleTimeString('it-IT', {hour: '2-digit', minute:'2-digit'})}
-                                  </span>
-                                </div>
-                                <span className={`font-black text-lg ${idx === 0 ? 'text-pink-400' : 'text-cyan-400'}`}>€{bid.amount}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </section>
         )}
       </div>
 
-      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 6) --- */}
+      {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 5) --- */}
       <nav className="fixed bottom-0 left-0 w-full bg-slate-900/95 backdrop-blur-md border-t-2 border-cyan-500 z-[200]">
-        <div className="grid grid-cols-6 max-w-md mx-auto px-1 pt-2 pb-6">
+        <div className="grid grid-cols-5 max-w-md mx-auto px-1 pt-2 pb-6">
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
@@ -1316,10 +1100,6 @@ export default function Home() {
           <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-600 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
             <span className="text-xl sm:text-2xl">🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
-          </button>
-          <button onClick={() => setActiveTab('shop')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'shop' ? 'text-purple-400 -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
-            <span className="text-xl sm:text-2xl">🛍️</span>
-            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Shop</span>
           </button>
           {isAdminUnlocked ? (
             <button onClick={() => setActiveTab('admin')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'admin' ? 'text-white -translate-y-1' : 'text-slate-400 hover:text-slate-200'}`}>
@@ -1344,31 +1124,6 @@ export default function Home() {
             <div className="flex justify-end gap-3">
               {modal.type === 'confirm' && <button onClick={closeModal} className="bg-slate-800 text-white px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest">Annulla</button>}
               <button onClick={() => { if (modal.type === 'confirm' && modal.onConfirm) modal.onConfirm(); else closeModal(); }} className="bg-orange-500 text-black px-5 py-2 rounded-lg font-black uppercase text-[10px] shadow-lg active:scale-95">Conferma</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- MODALE ASTA BUSTA CHIUSA --- */}
-      {isBidModalOpen && selectedBidItem && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-slate-900 border-4 border-pink-500 rounded-2xl p-6 max-w-sm w-full shadow-[8px_8px_0px_0px_rgba(236,72,153,1)]">
-            <h3 className="text-xl font-black uppercase mb-1 text-white italic">Piazza Offerta</h3>
-            <p className="text-[10px] text-pink-400 font-bold mb-6 uppercase">{selectedBidItem.name} - Base: €{selectedBidItem.base_price}</p>
-            {bidError && <div className="bg-red-900/30 border border-red-500 text-red-400 p-3 rounded-xl text-[10px] font-black uppercase mb-6 text-center">{bidError}</div>}
-            <div className="space-y-4 mb-8">
-              <div className="bg-black/50 p-3 rounded-xl border border-slate-800">
-                <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Stai offrendo come:</p>
-                <p className="text-sm text-slate-300 font-black uppercase">{user?.user_metadata?.full_name || extractNameFromEmail(user?.email)}</p>
-              </div>
-              <div>
-                <label className="text-[9px] font-black uppercase text-pink-500 block mb-1">La tua offerta (€)</label>
-                <input type="number" step="0.50" value={bidForm.amount} onChange={(e) => setBidForm({amount: e.target.value})} className="w-full bg-black text-pink-400 p-3 rounded-xl border border-pink-900 text-xl outline-none font-black" />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <button onClick={submitBid} disabled={isSubmittingBid} className="text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg bg-pink-600 active:scale-95">{isSubmittingBid ? 'Invio...' : 'Invia Busta Chiusa 🤫'}</button>
-              <button onClick={() => { setIsBidModalOpen(false); setBidForm({amount: ''}); setBidError(null); }} className="text-slate-500 py-2 font-black uppercase text-[10px] w-full">Annulla</button>
             </div>
           </div>
         </div>
