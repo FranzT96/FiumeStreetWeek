@@ -78,6 +78,7 @@ export default function Home() {
 
   useEffect(() => {
     checkSession();
+    fetchData(); // <--- AGGIUNTO QUI: scarica i dati subito per chiunque apra l'app!
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN') {
@@ -100,9 +101,7 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    if (user) fetchData();
-  }, [user]);
+  // IL VECCHIO useEffect(() => { if(user) fetchData(); }, [user]); E' STATO COMPLETAMENTE CANCELLATO.
 
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
   const showAlert = (title: string, message: string) => setModal({ isOpen: true, title, message, type: 'alert' });
