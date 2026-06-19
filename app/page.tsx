@@ -414,7 +414,7 @@ export default function Home() {
 
   // --- LOADING INIZIALE ---
   if (loading || authChecking) {
-    return <div className="min-h-screen bg-gradient-to-b from-[#090214] to-[#200535] flex items-center justify-center text-cyan-400 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
+    return <div className="min-h-screen bg-gradient-to-b from-[#090214] via-[#1c053a] to-[#4a0d2a] flex items-center justify-center text-pink-500 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
   }
 
   const liveGames = sortedGames.filter(g => g.status === 'in_corso').slice(0, 2);
@@ -427,8 +427,11 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#090214] to-[#200535] p-3 md:p-8 font-sans text-purple-200 pb-28 select-none">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <main className="min-h-screen bg-gradient-to-b from-[#090214] via-[#1c053a] to-[#4a0d2a] p-3 md:p-8 font-sans text-purple-200 pb-28 select-none relative">
+      {/* Sfumatura tramonto fissa sul fondo dello schermo */}
+      <div className="fixed bottom-0 left-0 w-full h-64 bg-gradient-to-t from-orange-600/20 via-pink-600/5 to-transparent pointer-events-none z-0"></div>
+      
+      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         
         {/* --- LOGO CON EASTER EGG (3 SECONDI) --- */}
         {activeTab === 'home' && (
@@ -919,7 +922,7 @@ export default function Home() {
       </div>
 
       {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 4 O 5) CON NEON GLOW --- */}
-      <nav className="fixed bottom-0 left-0 w-full bg-[#090214]/90 backdrop-blur-xl border-t border-cyan-500/50 shadow-[0_-5px_25px_rgba(6,182,212,0.2)] z-[200]">
+      <nav className="fixed bottom-0 left-0 w-full bg-[#090214]/80 backdrop-blur-xl border-t-2 border-pink-500 shadow-[0_-15px_40px_rgba(249,115,22,0.25)] z-[200]">
         <div className={`grid ${isAdminUnlocked ? 'grid-cols-5' : 'grid-cols-4'} max-w-md mx-auto px-1 pt-2 pb-6`}>
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
