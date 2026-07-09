@@ -42,6 +42,12 @@ export default function Home() {
 
   const [playoffScheme, setPlayoffScheme] = useState('AB_CD'); 
 
+  // --- STATI PER 3-POINT CONTEST ---
+  const [threePtPlayers, setThreePtPlayers] = useState<any[]>([]);
+  const [threePtSubTab, setThreePtSubTab] = useState('qualifiche');
+  const [new3PtName, setNew3PtName] = useState('');
+  const [editing3Pt, setEditing3Pt] = useState<any | null>(null); 
+
   const supabase = createClient();
   const groups = ['A', 'B', 'C', 'D'];
   const playoffStages = ['ottavi', 'quarti', 'semi', 'finali'];
@@ -70,9 +76,11 @@ export default function Home() {
   const fetchData = async () => {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
+    const { data: tptData } = await supabase.from('three_point_contest').select('*');
     
     if (teamsData) setTeams(teamsData);
     if (gamesData) setGames(gamesData);
+    if (tptData) setThreePtPlayers(tptData);
 
     setLoading(false);
   };
@@ -95,9 +103,10 @@ export default function Home() {
     const channelGames = supabase.channel('realtime-games').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games' }, () => { fetchData(); }).subscribe();
     const channelTeams = supabase.channel('realtime-teams').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, () => { fetchData(); }).subscribe();
     const channelPlayers = supabase.channel('realtime-players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => { fetchData(); }).subscribe();
+    const channel3pt = supabase.channel('realtime-3pt').on('postgres_changes', { event: '*', schema: 'public', table: 'three_point_contest' }, () => { fetchData(); }).subscribe();
     
     return () => { 
-      supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); 
+      supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); supabase.removeChannel(channel3pt);
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -413,6 +422,70 @@ export default function Home() {
     setModal({ isOpen: true, title: "Rimuovi", message: "Eliminare il giocatore?", type: 'confirm', onConfirm: async () => { await supabase.from('players').delete().eq('id', id); fetchData(); closeModal(); } });
   };
 
+  // --- LOGICA 3-POINT CONTEST ---
+  const add3PtPlayer = async () => {
+    if (!new3PtName) return;
+    await supabase.from('three_point_contest').insert({ name: new3PtName.toUpperCase(), stage: 'qualifiche' });
+    setNew3PtName('');
+    fetchData();
+  };
+
+  const save3PtPlayer = async () => {
+    if (!editing3Pt) return;
+    await supabase.from('three_point_contest').update({
+      name: editing3Pt.name.toUpperCase(),
+      score: parseInt(editing3Pt.score) || 0,
+      time_seconds: parseFloat(editing3Pt.time_seconds) || 999.99
+    }).eq('id', editing3Pt.id);
+    setEditing3Pt(null);
+    fetchData();
+  };
+
+  const delete3PtPlayer = async (id: number) => {
+    setModal({ isOpen: true, title: "Elimina Iscritto", message: "Sei sicuro di voler rimuovere questo tiratore?", type: 'confirm', onConfirm: async () => { await supabase.from('three_point_contest').delete().eq('id', id); fetchData(); closeModal(); } });
+  };
+
+  const close3PtStage = (currentStage: string, topCount: number, nextStage: string) => {
+    setModal({
+      isOpen: true, title: `CHIUDI ${currentStage.toUpperCase()}`, 
+      message: `I primi ${topCount} passeranno in ${nextStage.toUpperCase()}. Confermi? L'operazione è irreversibile.`, 
+      type: 'confirm', onConfirm: async () => {
+        closeModal();
+        setLoading(true);
+        // Prendi i migliori per questo stage
+        const playersInStage = threePtPlayers.filter(p => p.stage === currentStage);
+        const sorted = [...playersInStage].sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return a.time_seconds - b.time_seconds;
+        });
+        const winners = sorted.slice(0, topCount);
+        
+        // Copiali nel prossimo stage azzerando il punteggio
+        const newEntries = winners.map(w => ({ name: w.name, stage: nextStage, score: 0, time_seconds: 999.99 }));
+        await supabase.from('three_point_contest').insert(newEntries);
+        
+        setThreePtSubTab(nextStage);
+        fetchData();
+      }
+    });
+  };
+
+  const declare3PtWinner = () => {
+    setModal({
+      isOpen: true, title: "INCORONA VINCITORE", message: "Il primo in classifica verrà dichiarato campione. Confermi?", type: 'confirm', onConfirm: async () => {
+        closeModal(); setLoading(true);
+        const players = threePtPlayers.filter(p => p.stage === 'finali');
+        const sorted = [...players].sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score; return a.time_seconds - b.time_seconds;
+        });
+        if(sorted.length > 0) {
+          await supabase.from('three_point_contest').update({ stage: 'vincitore' }).eq('id', sorted[0].id);
+        }
+        fetchData();
+      }
+    });
+  };
+
   // --- LOADING INIZIALE ---
   if (loading || authChecking) {
     return <div className="min-h-screen bg-gradient-to-b from-[#090214] via-[#1c053a] to-[#4a0d2a] flex items-center justify-center text-pink-500 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
@@ -621,11 +694,129 @@ export default function Home() {
               </div>
             )}
 
-            {/* CONTENUTO 3-POINT CONTEST E KOTC */}
-            {(activeResultMainTab === '3pt' || activeResultMainTab === 'kotc') && (
+            {/* CONTENUTO 3-POINT CONTEST */}
+            {activeResultMainTab === '3pt' && (
+              <div className="animate-fade-in">
+                
+                {/* SUB-TAB 3-PT */}
+                <div className="flex gap-1 bg-[#090214]/60 backdrop-blur-sm p-1 rounded-xl border border-[#3d135e]/50 mb-6 shadow-inner overflow-x-auto hide-scrollbar">
+                  <button onClick={() => setThreePtSubTab('qualifiche')} className={`flex-1 py-2 px-3 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all ${threePtSubTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Qualifiche</button>
+                  <button onClick={() => setThreePtSubTab('semi')} className={`flex-1 py-2 px-3 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all ${threePtSubTab === 'semi' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Semifinali</button>
+                  <button onClick={() => setThreePtSubTab('finali')} className={`flex-1 py-2 px-3 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all ${threePtSubTab === 'finali' ? 'bg-yellow-400 text-[#090214] shadow-[0_0_10px_rgba(250,204,21,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Finali</button>
+                </div>
+
+                {/* VINCITORE SCREEN */}
+                {threePtSubTab === 'finali' && threePtPlayers.some(p => p.stage === 'vincitore') ? (
+                  <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-8 text-center shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden animate-fade-in">
+                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
+                    <span className="text-7xl block mb-4 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-pulse">🏆</span>
+                    <h3 className="text-cyan-400 font-black uppercase text-sm tracking-widest mb-1">Campione 3-PT 2026</h3>
+                    <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-4">
+                      {threePtPlayers.find(p => p.stage === 'vincitore')?.name}
+                    </p>
+                    <div className="inline-block bg-[#090214] border border-pink-500 rounded-xl px-6 py-2 shadow-[0_0_10px_rgba(236,72,153,0.5)]">
+                      <span className="text-pink-400 font-black text-xl">{threePtPlayers.find(p => p.stage === 'vincitore')?.score} PT</span>
+                      <span className="text-purple-400 font-mono text-sm ml-3">IN {threePtPlayers.find(p => p.stage === 'vincitore')?.time_seconds}s</span>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* PANNELLO ADMIN AGGIUNTA E CHIUSURA (Visibile solo all'admin nel tab 3PT) */}
+                    {isAdminUnlocked && (
+                      <div className="bg-[#1a0833]/60 backdrop-blur-md border border-pink-500/50 rounded-xl p-4 mb-6 shadow-[0_0_15px_rgba(236,72,153,0.2)]">
+                        <h3 className="text-pink-400 font-black uppercase text-[10px] tracking-widest mb-3">Gestione {threePtSubTab}</h3>
+                        
+                        {/* Aggiunta Giocatore solo in Qualifiche */}
+                        {threePtSubTab === 'qualifiche' && (
+                          <div className="flex gap-2 mb-4">
+                            <input placeholder="NOME TIRATORE" className="flex-1 bg-[#090214] text-white p-3 rounded-lg text-xs outline-none uppercase border border-[#3d135e] focus:border-cyan-400 transition-all font-black" value={new3PtName} onChange={(e) => setNew3PtName(e.target.value)} />
+                            <button onClick={add3PtPlayer} className="bg-cyan-500 text-[#090214] font-black px-5 rounded-lg text-[10px] uppercase tracking-widest shadow-[0_0_10px_rgba(6,182,212,0.5)] active:scale-95">Add</button>
+                          </div>
+                        )}
+
+                        {/* Bottoni "FINE" */}
+                        {threePtSubTab === 'qualifiche' && (
+                          <button onClick={() => close3PtStage('qualifiche', 10, 'semi')} className="w-full bg-[#090214] border border-pink-500 text-pink-400 font-black uppercase text-[10px] py-3 rounded-lg tracking-widest hover:bg-pink-600 hover:text-white transition-all">Chiudi Qualifiche (Passano i TOP 10) ➔</button>
+                        )}
+                        {threePtSubTab === 'semi' && (
+                          <button onClick={() => close3PtStage('semi', 3, 'finali')} className="w-full bg-[#090214] border border-pink-500 text-pink-400 font-black uppercase text-[10px] py-3 rounded-lg tracking-widest hover:bg-pink-600 hover:text-white transition-all">Chiudi Semifinali (Passano i TOP 3) ➔</button>
+                        )}
+                        {threePtSubTab === 'finali' && (
+                          <button onClick={declare3PtWinner} className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-[#090214] font-black uppercase text-xs py-4 rounded-lg tracking-widest shadow-[0_0_15px_rgba(250,204,21,0.5)] active:scale-95 transition-all">🏆 INCORONA VINCITORE 🏆</button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* CLASSIFICA PUBBLICA */}
+                    <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                      <div className="flex justify-between px-3 py-2 bg-[#1a0833] border-b border-[#3d135e] text-[9px] font-black uppercase tracking-widest text-purple-400">
+                        <span>Rank & Nome</span>
+                        <div className="flex gap-4">
+                          <span>Punti</span>
+                          <span>Tempo</span>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const currentPlayers = threePtPlayers.filter(p => p.stage === threePtSubTab);
+                        const sorted = [...currentPlayers].sort((a, b) => {
+                          if (b.score !== a.score) return b.score - a.score;
+                          return a.time_seconds - b.time_seconds;
+                        });
+
+                        const passLimit = threePtSubTab === 'qualifiche' ? 10 : threePtSubTab === 'semi' ? 3 : 1;
+
+                        if (sorted.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun tiratore.</div>;
+
+                        return sorted.map((p, index) => {
+                          const isPassing = index < passLimit;
+                          return (
+                            <div key={p.id} className={`p-3 border-b border-[#3d135e] last:border-0 transition-colors ${isPassing ? 'bg-cyan-900/20' : 'hover:bg-[#1a0833]/50'}`}>
+                              
+                              {/* VISTA ADMIN (Modifica riga) */}
+                              {isAdminUnlocked && editing3Pt?.id === p.id ? (
+                                <div className="flex flex-col gap-2">
+                                  <input className="bg-[#090214] text-white p-2 rounded text-[10px] font-black uppercase border border-cyan-500 outline-none w-full" value={editing3Pt.name} onChange={(e) => setEditing3Pt({...editing3Pt, name: e.target.value})} placeholder="Nome" />
+                                  <div className="flex gap-2">
+                                    <input type="number" className="flex-1 bg-[#090214] text-pink-400 p-2 rounded text-xs font-black border border-pink-500 outline-none" value={editing3Pt.score} onChange={(e) => setEditing3Pt({...editing3Pt, score: e.target.value})} placeholder="Punti" />
+                                    <input type="number" step="0.01" className="flex-1 bg-[#090214] text-yellow-400 p-2 rounded text-xs font-mono font-black border border-yellow-500 outline-none" value={editing3Pt.time_seconds} onChange={(e) => setEditing3Pt({...editing3Pt, time_seconds: e.target.value})} placeholder="Secondi (es. 55.4)" />
+                                    <button onClick={save3PtPlayer} className="bg-cyan-500 text-[#090214] px-4 rounded font-black text-[9px] uppercase">SALVA</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* VISTA NORMALE PUBBLICA */
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-3">
+                                    <span className={`font-black text-xs w-5 text-right ${isPassing ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'text-purple-500'}`}>{index + 1}.</span>
+                                    <span className="text-[11px] font-black uppercase text-purple-100">{p.name}</span>
+                                    {isAdminUnlocked && (
+                                      <div className="flex gap-2 ml-2">
+                                        <button onClick={() => setEditing3Pt({ ...p })} className="text-purple-500 hover:text-cyan-400 text-[10px]">✏️</button>
+                                        <button onClick={() => delete3PtPlayer(p.id)} className="text-purple-500 hover:text-pink-500 text-[10px]">❌</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-4 font-black">
+                                    <span className={`text-sm ${isPassing ? 'text-pink-400 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]' : 'text-purple-300'}`}>{p.score}</span>
+                                    <span className={`text-xs font-mono w-10 text-right mt-0.5 ${isPassing ? 'text-yellow-400 drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]' : 'text-purple-500'}`}>{p.time_seconds === 999.99 ? '--' : p.time_seconds}</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* CONTENUTO KOTC (Ancora Vuoto) */}
+            {activeResultMainTab === 'kotc' && (
                <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-4 shadow-[0_0_15px_rgba(0,0,0,0.5)] animate-fade-in">
-                 <span className="text-3xl block mb-3 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">🏀</span>
-                 <p className="text-purple-400 font-black uppercase tracking-widest text-[11px] italic">Classifiche in aggiornamento...</p>
+                 <span className="text-3xl block mb-3 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">👑</span>
+                 <p className="text-purple-400 font-black uppercase tracking-widest text-[11px] italic">KOTC in aggiornamento...</p>
                </div>
             )}
 
