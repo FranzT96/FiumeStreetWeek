@@ -1148,18 +1148,6 @@ export default function Home() {
         {activeTab === 'playoff' && (
           <section className="animate-fade-in pt-4 relative z-10 h-[calc(100vh-140px)] flex flex-col">
             <h2 className="text-xl font-black uppercase border-b-2 border-[#3d135e] pb-2 italic tracking-widest mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)] shrink-0">Tabellone Finale</h2>
-            
-            {/* 🏆 BANNER CAMPIONI 3VS3 */}
-            {tournamentChampion && (
-              <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-6 text-center shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden animate-fade-in mb-4 shrink-0 mx-4 md:mx-0">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
-                <span className="text-6xl block mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
-                <h3 className="text-cyan-400 font-black uppercase text-xs tracking-widest mb-1">CAMPIONI FSW 2026</h3>
-                <p className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-2">
-                  {tournamentChampion.name}
-                </p>
-              </div>
-            )}
 
             {games.filter(g => g.stage && g.stage !== 'girone').length === 0 ? (
               <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-8">
@@ -1304,7 +1292,7 @@ export default function Home() {
                   })}
 
                   {/* 🏆 COLONNA AGGIUNTIVA: IL PODIO 🏆 */}
-                  <div className="w-[300px] flex flex-col justify-center relative pl-10 border-l-2 border-dashed border-pink-500/30 ml-6 shrink-0 pt-4">
+                  <div className="w-[300px] flex flex-col justify-center relative pl-10 border-l-2 border-dashed border-pink-500/30 ml-6 shrink-0 h-[1040px]">
                     
                     <div className="w-full text-center text-yellow-400 font-black uppercase tracking-[0.3em] text-lg drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-12">
                       PODIO UFFICIALE
