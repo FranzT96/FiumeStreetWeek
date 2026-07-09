@@ -231,10 +231,13 @@ export default function Home() {
   const adminLiveGames = [ ...sortedGames.filter(g => g.status === 'in_corso'), ...sortedGames.filter(g => g.status === 'programmata'), ...sortedGames.filter(g => g.status === 'finita') ];
 
   const generateBracket = async () => {
-    if (games.some(g => g.stage && g.stage !== 'girone')) {
-      showAlert("Attenzione", "I Playoff sono già stati generati! Se vuoi rigenerarli, apri il menu ⋮ e usa 'Azzera Torneo' per ricalcolare gli incroci.");
+    // Controllo: se O1 ha già una squadra assegnata, vuol dire che l'abbiamo già generato
+    const o1Match = games.find(g => g.bracket_code === 'O1');
+    if (o1Match && o1Match.home_team_id) {
+      showAlert("Attenzione", "I Playoff sono già stati popolati! Se vuoi rigenerarli, devi prima azzerare il torneo dal menu in alto.");
       return;
     }
+    
     setLoading(true);
     const getTeam = (group: string, rank: number) => {
       const gTeams = teams.filter(t => t.group_name === group);
@@ -245,27 +248,24 @@ export default function Home() {
     };
     const [g1, g2, g3, g4] = schemeMap[playoffScheme];
 
-    const playoffMatches = [
-      { stage: 'ottavi', bracket_code: 'O1', home_team_id: getTeam(g1, 1), away_team_id: getTeam(g2, 4), match_time: '19:00', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O2', home_team_id: getTeam(g3, 2), away_team_id: getTeam(g4, 3), match_time: '19:00', court: 'B', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O3', home_team_id: getTeam(g2, 1), away_team_id: getTeam(g1, 4), match_time: '19:20', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O4', home_team_id: getTeam(g4, 2), away_team_id: getTeam(g3, 3), match_time: '19:20', court: 'B', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O5', home_team_id: getTeam(g3, 1), away_team_id: getTeam(g4, 4), match_time: '19:40', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O6', home_team_id: getTeam(g1, 2), away_team_id: getTeam(g2, 3), match_time: '19:40', court: 'B', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O7', home_team_id: getTeam(g4, 1), away_team_id: getTeam(g3, 4), match_time: '20:00', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'ottavi', bracket_code: 'O8', home_team_id: getTeam(g2, 2), away_team_id: getTeam(g1, 3), match_time: '20:00', court: 'B', status: 'programmata', is_event: false },
-      { stage: 'quarti', bracket_code: 'Q1', match_time: '20:20', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'quarti', bracket_code: 'Q2', match_time: '20:20', court: 'B', status: 'programmata', is_event: false },
-      { stage: 'quarti', bracket_code: 'Q3', match_time: '20:40', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'quarti', bracket_code: 'Q4', match_time: '20:40', court: 'B', status: 'programmata', is_event: false },
-      { stage: 'semi', bracket_code: 'S1', match_time: '21:00', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'semi', bracket_code: 'S2', match_time: '21:20', court: 'A', status: 'programmata', is_event: false },
-      { stage: 'finali', bracket_code: 'F3', match_time: '21:40', court: 'A', status: 'programmata', is_event: false }, 
-      { stage: 'finali', bracket_code: 'F1', match_time: '22:10', court: 'A', status: 'programmata', is_event: false }, 
+    // Prepariamo l'inserimento dei nomi nei buchi TBD degli OTTAVI
+    const updates = [
+      { code: 'O1', home: getTeam(g1, 1), away: getTeam(g2, 4) },
+      { code: 'O2', home: getTeam(g3, 2), away: getTeam(g4, 3) },
+      { code: 'O3', home: getTeam(g2, 1), away: getTeam(g1, 4) },
+      { code: 'O4', home: getTeam(g4, 2), away: getTeam(g3, 3) },
+      { code: 'O5', home: getTeam(g3, 1), away: getTeam(g4, 4) },
+      { code: 'O6', home: getTeam(g1, 2), away: getTeam(g2, 3) },
+      { code: 'O7', home: getTeam(g4, 1), away: getTeam(g3, 4) },
+      { code: 'O8', home: getTeam(g2, 2), away: getTeam(g1, 3) }
     ];
-    await supabase.from('games').insert(playoffMatches);
+
+    for (const u of updates) {
+      await supabase.from('games').update({ home_team_id: u.home, away_team_id: u.away }).eq('bracket_code', u.code);
+    }
+
     fetchData();
-    showAlert("Generato!", "Il tabellone dei Playoff è stato generato in base agli incroci scelti e alla classifica attuale.");
+    showAlert("Generato!", "Le squadre sono state inserite nel tabellone dei Playoff in base alla classifica finale dei gironi!");
   };
 
   const advancePlayoffTeam = async (game: any, winnerId: number, loserId: number) => {
@@ -1473,6 +1473,71 @@ export default function Home() {
         </div>
       </nav>
 
+{/* --- MODALE EDIT PARTITA / EVENTO --- */}
+      {gameToEdit && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[#090214]/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-[#110524] border-2 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_30px_rgba(6,182,212,0.3)]">
+            <h3 className="text-xl font-black uppercase mb-4 text-white italic drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+              Modifica {gameToEdit.is_event ? 'Evento' : 'Partita'}
+            </h3>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-[10px] text-cyan-400 font-black uppercase mb-1 block">Orario</label>
+                  <input type="time" value={gameToEdit.match_time} onChange={(e) => setGameToEdit({...gameToEdit, match_time: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-sm border border-[#3d135e] outline-none focus:border-cyan-500 font-mono" />
+                </div>
+                <div className="w-24">
+                  <label className="text-[10px] text-cyan-400 font-black uppercase mb-1 block">Campo</label>
+                  <select value={gameToEdit.court} onChange={(e) => setGameToEdit({...gameToEdit, court: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-sm border border-[#3d135e] outline-none focus:border-cyan-500 font-black">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                  </select>
+                </div>
+              </div>
+
+              {gameToEdit.is_event ? (
+                <>
+                  <div>
+                    <label className="text-[10px] text-pink-400 font-black uppercase mb-1 block">Descrizione</label>
+                    <input type="text" value={gameToEdit.event_description || ''} onChange={(e) => setGameToEdit({...gameToEdit, event_description: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-xs border border-[#3d135e] outline-none focus:border-pink-500 uppercase font-black" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-pink-400 font-black uppercase mb-1 block">Durata (min)</label>
+                    <input type="number" value={gameToEdit.event_duration || 0} onChange={(e) => setGameToEdit({...gameToEdit, event_duration: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-sm border border-[#3d135e] outline-none focus:border-pink-500 font-mono" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-[10px] text-purple-400 font-black uppercase mb-1 block">Squadra Casa</label>
+                    <select value={gameToEdit.home_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, home_team_id: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-[11px] uppercase border border-[#3d135e] outline-none focus:border-cyan-500 font-black">
+                      <option value="">-- TBD --</option>
+                      {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-purple-400 font-black uppercase mb-1 block">Squadra Trasferta</label>
+                    <select value={gameToEdit.away_team_id || ''} onChange={(e) => setGameToEdit({...gameToEdit, away_team_id: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-[11px] uppercase border border-[#3d135e] outline-none focus:border-cyan-500 font-black">
+                      <option value="">-- TBD --</option>
+                      {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center mt-6">
+              <button onClick={() => deleteGame(gameToEdit.id)} className="text-pink-500 font-black text-[10px] uppercase hover:text-pink-400 drop-shadow-[0_0_3px_rgba(236,72,153,0.5)]">🗑️ Elimina</button>
+              <div className="flex gap-2">
+                <button onClick={() => setGameToEdit(null)} className="bg-transparent border border-purple-500/50 text-purple-300 px-4 py-3 rounded-lg font-black uppercase text-[10px] hover:bg-[#1a0833] transition-all">Annulla</button>
+                <button onClick={saveQuickEdit} className="bg-cyan-500 text-[#090214] px-5 py-3 rounded-lg font-black uppercase text-[10px] shadow-[0_0_10px_rgba(6,182,212,0.6)] active:scale-95 transition-all">Salva</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* --- MODALE ALERTS / CONFERME --- */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[#090214]/90 backdrop-blur-md p-4 animate-fade-in">
