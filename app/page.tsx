@@ -782,12 +782,20 @@ export default function Home() {
                               
                               {/* VISTA ADMIN (Modifica riga) */}
                               {isAdminUnlocked && editing3Pt?.id === p.id ? (
-                                <div className="flex flex-col gap-2">
-                                  <input className="bg-[#090214] text-white p-2 rounded text-[10px] font-black uppercase border border-cyan-500 outline-none w-full" value={editing3Pt.name} onChange={(e) => setEditing3Pt({...editing3Pt, name: e.target.value})} placeholder="Nome" />
-                                  <div className="flex gap-2">
-                                    <input type="number" className="flex-1 bg-[#090214] text-pink-400 p-2 rounded text-xs font-black border border-pink-500 outline-none" value={editing3Pt.score} onChange={(e) => setEditing3Pt({...editing3Pt, score: e.target.value})} placeholder="Punti" />
-                                    <input type="number" step="0.01" className="flex-1 bg-[#090214] text-yellow-400 p-2 rounded text-xs font-mono font-black border border-yellow-500 outline-none" value={editing3Pt.time_seconds} onChange={(e) => setEditing3Pt({...editing3Pt, time_seconds: e.target.value})} placeholder="Secondi (es. 55.4)" />
-                                    <button onClick={save3PtPlayer} className="bg-cyan-500 text-[#090214] px-4 rounded font-black text-[9px] uppercase">SALVA</button>
+                                <div className="flex flex-col gap-3 bg-[#1a0833] p-4 rounded-xl border border-[#3d135e] shadow-inner my-2">
+                                  {/* RIGA 1: NOME */}
+                                  <input className="bg-[#090214] text-white p-3 rounded-lg text-[11px] font-black uppercase border border-cyan-500 outline-none w-full shadow-[0_0_8px_rgba(6,182,212,0.2)]" value={editing3Pt.name} onChange={(e) => setEditing3Pt({...editing3Pt, name: e.target.value})} placeholder="NOME TIRATORE" />
+                                  
+                                  {/* RIGA 2: PUNTI E TEMPO */}
+                                  <div className="flex gap-3">
+                                    <input type="number" className="flex-1 bg-[#090214] text-pink-400 p-3 rounded-lg text-sm font-black border border-pink-500 outline-none text-center shadow-[0_0_8px_rgba(236,72,153,0.2)]" value={editing3Pt.score == 0 ? '' : editing3Pt.score} onChange={(e) => setEditing3Pt({...editing3Pt, score: e.target.value})} placeholder="PUNTI" />
+                                    <input type="number" step="0.01" className="flex-1 bg-[#090214] text-yellow-400 p-3 rounded-lg text-sm font-mono font-black border border-yellow-500 outline-none text-center shadow-[0_0_8px_rgba(250,204,21,0.2)]" value={editing3Pt.time_seconds == 999.99 ? '' : editing3Pt.time_seconds} onChange={(e) => setEditing3Pt({...editing3Pt, time_seconds: e.target.value})} placeholder="TEMPO (s)" />
+                                  </div>
+                                  
+                                  {/* RIGA 3: BOTTONI */}
+                                  <div className="flex gap-2 mt-1">
+                                    <button onClick={() => setEditing3Pt(null)} className="flex-1 bg-transparent border border-purple-500/50 text-purple-300 py-3 rounded-lg font-black text-[10px] uppercase active:scale-95 transition-all">ANNULLA</button>
+                                    <button onClick={save3PtPlayer} className="flex-[2] bg-cyan-500 text-[#090214] py-3 rounded-lg font-black text-[11px] uppercase shadow-[0_0_15px_rgba(6,182,212,0.5)] active:scale-95 transition-all">SALVA RISULTATO</button>
                                   </div>
                                 </div>
                               ) : (
