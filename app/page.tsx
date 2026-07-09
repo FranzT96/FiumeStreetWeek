@@ -16,6 +16,7 @@ export default function Home() {
   
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
+  const [activeResultMainTab, setActiveResultMainTab] = useState('3vs3'); 
   const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
   
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
@@ -561,51 +562,73 @@ export default function Home() {
           </section>
         )}
 
-        {/* --- CALENDARIO PUBBLICO --- */}
+        {/* --- RISULTATI PUBBLICO  --- */}
         {activeTab === 'calendario' && (
           <section className="animate-fade-in space-y-4 pt-4 relative z-10">
             
-            <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] mb-6 shadow-lg">
-              <button onClick={() => setActiveScheduleTab('qualifiche')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Qualifiche</button>
-              <button onClick={() => setActiveScheduleTab('finali')} className={`flex-1 py-3 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Finali</button>
+            {/* NUOVI TAB PRINCIPALI: 3VS3, 3-PT, KOTC */}
+            <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] shadow-lg overflow-x-auto hide-scrollbar">
+              <button onClick={() => setActiveResultMainTab('3vs3')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3vs3' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3VS3</button>
+              <button onClick={() => setActiveResultMainTab('3pt')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3pt' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3-PT Contest</button>
+              <button onClick={() => setActiveResultMainTab('kotc')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === 'kotc' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-[#090214] shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>KOTC</button>
             </div>
 
-            <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-              {(() => {
-                const list = activeScheduleTab === 'qualifiche' 
-                  ? sortedGames.filter(g => !g.stage || g.stage === 'girone')
-                  : sortedGames.filter(g => g.stage && g.stage !== 'girone');
-                
-                const displayList = (activeScheduleTab === 'finali' && list.length === 0) ? dummyFinals : list;
+            {/* CONTENUTO 3VS3 */}
+            {activeResultMainTab === '3vs3' && (
+              <div className="animate-fade-in">
+                {/* SUB-TAB QUALIFICHE / FINALI */}
+                <div className="flex gap-2 bg-[#090214]/60 backdrop-blur-sm p-1 rounded-xl border border-[#3d135e]/50 mb-4 w-max mx-auto shadow-inner">
+                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`py-2 px-5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Qualifiche</button>
+                  <button onClick={() => setActiveScheduleTab('finali')} className={`py-2 px-5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Finali</button>
+                </div>
 
-                if (displayList.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun match trovato.</div>;
+                <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]">
+                  {(() => {
+                    // sortedGames le ordina già per orario crescente!
+                    const list = activeScheduleTab === 'qualifiche' 
+                      ? sortedGames.filter(g => !g.stage || g.stage === 'girone')
+                      : sortedGames.filter(g => g.stage && g.stage !== 'girone');
+                    
+                    const displayList = (activeScheduleTab === 'finali' && list.length === 0) ? dummyFinals : list;
 
-                return displayList.map((game, i) => {
-                  if (game.is_event) {
-                    return (
-                      <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 p-3 bg-gradient-to-r from-[#2a063b] to-[#1a0525] border-b border-[#3d135e] last:border-0 shadow-inner">
-                        <div className="font-mono font-black text-yellow-400 text-[10px] drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]">{game.match_time}</div>
-                        <div className="text-center font-black text-pink-400 text-[11px] uppercase leading-tight tracking-widest break-words px-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.3)]">{game.event_description}</div>
-                        <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
-                      <div className="font-mono font-black text-cyan-400 text-[10px] drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</div>
-                      <div className="text-right font-black text-purple-100 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
-                      <div className="flex justify-center items-center px-1">
-                        {game.status === 'finita' ? (
-                          <div className="bg-[#1a0833] border border-cyan-500/50 px-1.5 py-0.5 rounded text-cyan-300 font-black text-[10px] shadow-[0_0_5px_rgba(6,182,212,0.3)]">{game.home_score}-{game.away_score}</div>
-                        ) : <div className="text-purple-500 font-black italic text-[9px] drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>}
-                      </div>
-                      <div className="text-left font-black text-purple-100 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                      <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(250,204,21,0.6)]">{game.court}</span></div>
-                    </div>
-                  );
-                });
-              })()}
-            </div>
+                    if (displayList.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun risultato disponibile.</div>;
+
+                    return displayList.map((game, i) => {
+                      if (game.is_event) return null; // Togliamo gli eventi (come i contest) da questa lista 3vs3
+
+                      return (
+                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
+                          <div className="font-mono font-black text-cyan-400 text-[10px] drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</div>
+                          <div className="text-right font-black text-purple-100 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                          
+                          <div className="flex justify-center items-center px-1 min-w-[35px]">
+                            {game.status === 'finita' ? (
+                              <div className="bg-[#1a0833] border border-cyan-500/50 px-2 py-1 rounded text-cyan-300 font-black text-[12px] shadow-[0_0_8px_rgba(6,182,212,0.4)] whitespace-nowrap">{game.home_score} - {game.away_score}</div>
+                            ) : game.status === 'in_corso' ? (
+                              <div className="bg-pink-600 border border-pink-400 px-2 py-0.5 rounded text-white font-black text-[9px] shadow-[0_0_8px_rgba(236,72,153,0.8)] animate-pulse">LIVE</div>
+                            ) : (
+                              <div className="text-purple-500 font-black italic text-[9px] drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
+                            )}
+                          </div>
+                          
+                          <div className="text-left font-black text-purple-100 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                          <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(250,204,21,0.6)]">{game.court}</span></div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* CONTENUTO 3-POINT CONTEST E KOTC */}
+            {(activeResultMainTab === '3pt' || activeResultMainTab === 'kotc') && (
+               <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-4 shadow-[0_0_15px_rgba(0,0,0,0.5)] animate-fade-in">
+                 <span className="text-3xl block mb-3 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">🏀</span>
+                 <p className="text-purple-400 font-black uppercase tracking-widest text-[11px] italic">Classifiche in aggiornamento...</p>
+               </div>
+            )}
+
           </section>
         )}
 
@@ -980,7 +1003,7 @@ export default function Home() {
           </button>
           <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-yellow-400 -translate-y-1 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">📅</span>
-            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Orari</span>
+            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Risultati</span>
           </button>
           <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🏆</span>
