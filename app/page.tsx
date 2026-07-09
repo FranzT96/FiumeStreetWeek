@@ -1148,18 +1148,6 @@ export default function Home() {
         {activeTab === 'playoff' && (
           <section className="animate-fade-in pt-4 relative z-10 h-[calc(100vh-140px)] flex flex-col">
             <h2 className="text-xl font-black uppercase border-b-2 border-[#3d135e] pb-2 italic tracking-widest mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)] shrink-0">Tabellone Finale</h2>
-            
-            {/* 🏆 BANNER CAMPIONI 3VS3 (Visibile solo a fine torneo) */}
-            {tournamentChampion && (
-              <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-6 text-center shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden animate-fade-in mb-4 shrink-0 mx-4 md:mx-0">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
-                <span className="text-6xl block mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
-                <h3 className="text-cyan-400 font-black uppercase text-xs tracking-widest mb-1">CAMPIONI FSW 2026</h3>
-                <p className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-2">
-                  {tournamentChampion.name}
-                </p>
-              </div>
-            )}
 
             {games.filter(g => g.stage && g.stage !== 'girone').length === 0 ? (
               <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-8">
@@ -1173,7 +1161,8 @@ export default function Home() {
                 <div className="flex gap-12 pt-12 pb-8 px-8 min-w-max items-start">
                   
                   {playoffStages.map((stage) => {
-                    const stageGames = sortedGames.filter(g => g.stage === stage);
+                    // BUGFIX: Filtriamo prima gli eventi, così l'indice 'i' parte sempre da 0 per le partite VERE
+                    const stageGames = sortedGames.filter(g => g.stage === stage && !g.is_event);
                     if (stageGames.length === 0) return null;
                     
                     return (
@@ -1184,14 +1173,12 @@ export default function Home() {
                         </div>
                         
                         {stageGames.map((game, i) => {
-                          if(game.is_event) return null; 
-                          
                           // Colori specifici per le due Finali
                           let badgeBg = "bg-cyan-500"; let badgeShadow = "shadow-[0_0_8px_rgba(6,182,212,0.6)]"; let badgeText = `MATCH ${game.bracket_code}`;
                           if (game.bracket_code === 'F1') { badgeBg = "bg-yellow-400"; badgeShadow = "shadow-[0_0_10px_rgba(250,204,21,0.6)]"; badgeText = "🏆 1°/2° POSTO"; }
                           else if (game.bracket_code === 'F3') { badgeBg = "bg-orange-500 text-white"; badgeShadow = "shadow-[0_0_10px_rgba(249,115,22,0.6)]"; badgeText = "🥉 3°/4° POSTO"; }
 
-                          // Calcolo Altezza per Centratura Perfetta dell'Albero (130, 260, 520)
+                          // Calcolo Altezza per Centratura Perfetta dell'Albero
                           const hClass = stage === 'ottavi' ? 'h-[130px]' : stage === 'quarti' ? 'h-[260px]' : 'h-[520px]';
 
                           return (
@@ -1239,8 +1226,10 @@ export default function Home() {
                   })}
 
                   {/* 🏆 COLONNA AGGIUNTIVA: IL PODIO 🏆 */}
-                  <div className="w-[300px] flex flex-col justify-center relative pl-10 border-l-2 border-dashed border-pink-500/30 ml-6 shrink-0">
-                    <div className="absolute top-[5%] left-0 w-full text-center text-yellow-400 font-black uppercase tracking-[0.3em] text-lg drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]">
+                  <div className="w-[300px] flex flex-col justify-center relative pl-10 border-l-2 border-dashed border-pink-500/30 ml-6 shrink-0 pt-4">
+                    
+                    {/* BUGFIX: Titolo spostato con margin e non in absolute */}
+                    <div className="w-full text-center text-yellow-400 font-black uppercase tracking-[0.3em] text-lg drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-12">
                       PODIO UFFICIALE
                     </div>
 
@@ -1267,24 +1256,24 @@ export default function Home() {
                       );
 
                       return (
-                        <div className="flex flex-col gap-6 w-full">
+                        <div className="flex flex-col gap-10 w-full pb-8">
                           {p1 && (
                             <div className="bg-gradient-to-br from-yellow-500/20 to-[#090214] border-2 border-yellow-400 rounded-xl p-6 text-center shadow-[0_0_30px_rgba(250,204,21,0.3)] relative transform hover:scale-105 transition-transform cursor-default">
-                              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">👑</span>
+                              <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-5xl drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">👑</span>
                               <h4 className="text-yellow-400 font-black text-[10px] uppercase tracking-widest mt-2">1° Classificato</h4>
                               <p className="text-white font-black text-2xl uppercase mt-1 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{p1.name}</p>
                             </div>
                           )}
                           {p2 && (
-                            <div className="bg-gradient-to-br from-gray-400/20 to-[#090214] border-2 border-gray-400 rounded-xl p-5 text-center shadow-[0_0_20px_rgba(156,163,175,0.3)] relative">
-                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_10px_rgba(156,163,175,0.8)]">🥈</span>
+                            <div className="bg-gradient-to-br from-gray-400/20 to-[#090214] border-2 border-gray-400 rounded-xl p-5 text-center shadow-[0_0_20px_rgba(156,163,175,0.3)] relative mt-4">
+                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_10px_rgba(156,163,175,0.8)]">🥈</span>
                               <h4 className="text-gray-400 font-black text-[10px] uppercase tracking-widest mt-1">2° Classificato</h4>
                               <p className="text-white font-black text-xl uppercase mt-1">{p2.name}</p>
                             </div>
                           )}
                           {p3 && (
-                            <div className="bg-gradient-to-br from-orange-600/20 to-[#090214] border-2 border-orange-500 rounded-xl p-4 text-center shadow-[0_0_20px_rgba(249,115,22,0.3)] relative">
-                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]">🥉</span>
+                            <div className="bg-gradient-to-br from-orange-600/20 to-[#090214] border-2 border-orange-500 rounded-xl p-4 text-center shadow-[0_0_20px_rgba(249,115,22,0.3)] relative mt-4">
+                              <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]">🥉</span>
                               <h4 className="text-orange-500 font-black text-[10px] uppercase tracking-widest mt-1">3° Classificato</h4>
                               <p className="text-white font-black text-lg uppercase mt-1">{p3.name}</p>
                             </div>
