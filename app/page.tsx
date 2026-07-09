@@ -1509,7 +1509,7 @@ export default function Home() {
                               {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-3 py-1.5 rounded-md w-full uppercase tracking-widest shadow-[0_0_8px_rgba(236,72,153,0.6)]">Chiudi</button>}
                               {game.status === 'finita' && <span className="text-purple-500 text-[10px] font-black uppercase tracking-widest block">Finita</span>}
                             </div>
-
+ 
                             <div className="flex flex-col justify-between text-center w-[35%]">
                               <p className={`text-[10px] font-black uppercase mb-1 leading-tight break-words ${game.status === 'in_corso' ? 'text-cyan-400 drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]' : 'text-purple-400'}`}>{game.away_team?.name || 'TBD'}</p>
                               <p className={`text-3xl font-black mt-auto drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.status === 'in_corso' ? 'text-white' : 'text-purple-500'}`}>{game.away_score}</p>
