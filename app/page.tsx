@@ -1146,78 +1146,135 @@ export default function Home() {
 
         {/* --- PLAYOFF TAB PUBBLICO --- */}
         {activeTab === 'playoff' && (
-          <section className="animate-fade-in pt-4 relative z-10">
-            <h2 className="text-xl font-black uppercase border-b-2 border-[#3d135e] pb-2 italic tracking-widest mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)]">Tabellone Finale</h2>
+          <section className="animate-fade-in pt-4 relative z-10 h-[calc(100vh-140px)] flex flex-col">
+            <h2 className="text-xl font-black uppercase border-b-2 border-[#3d135e] pb-2 italic tracking-widest mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 drop-shadow-[0_0_5px_rgba(250,204,21,0.5)] shrink-0">Tabellone Finale</h2>
             
-            {/* 🏆 BANNER CAMPIONI 3VS3 (Visibile solo a fine torneo) */}
-            {tournamentChampion && (
-              <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-6 text-center shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden animate-fade-in mb-8">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
-                <span className="text-6xl block mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
-                <h3 className="text-cyan-400 font-black uppercase text-xs tracking-widest mb-1">CAMPIONI FSW 2026</h3>
-                <p className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-2">
-                  {tournamentChampion.name}
-                </p>
-              </div>
-            )}
-
             {games.filter(g => g.stage && g.stage !== 'girone').length === 0 ? (
               <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-8">
                 <p className="text-purple-400 font-black uppercase tracking-widest text-sm italic">Tabellone in via di definizione...</p>
                 <p className="text-purple-500/70 text-xs font-bold mt-2">I playoff appariranno qui al termine della fase a gironi.</p>
               </div>
             ) : (
-              <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-8 hide-scrollbar px-2">
-                {playoffStages.map(stage => {
-                  const stageGames = sortedGames.filter(g => g.stage === stage);
-                  if (stageGames.length === 0) return null;
+              <div className="flex-1 overflow-x-auto overflow-y-auto hide-scrollbar relative -mx-3 px-3 md:mx-0 md:px-0">
+                {/* Contenitore Fisso dell'Albero (Scorrevole) */}
+                <div className="flex gap-10 pt-10 pb-8 px-4 min-w-max h-[900px] items-stretch">
                   
-                  return (
-                    <div key={stage} className="min-w-[85vw] sm:min-w-[320px] snap-center flex flex-col gap-4 relative">
-                      <div className="bg-pink-600 text-white text-center py-2 rounded-t-xl font-black uppercase tracking-widest text-sm shadow-[0_0_15px_rgba(236,72,153,0.5)] z-10">
-                        {stage === 'finali' ? 'FINALI' : stage === 'semi' ? 'SEMIFINALI' : stage}
-                      </div>
-                      
-                      {stageGames.map((game, i) => {
-                        if(game.is_event) return null; 
+                  {playoffStages.map((stage) => {
+                    const stageGames = sortedGames.filter(g => g.stage === stage);
+                    if (stageGames.length === 0) return null;
+                    
+                    return (
+                      <div key={stage} className="w-[260px] flex flex-col justify-around relative">
+                        {/* Intestazione Colonna */}
+                        <div className="absolute -top-4 left-0 w-full text-center text-pink-500 font-black uppercase tracking-widest text-sm drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">
+                          {stage === 'finali' ? 'FINALI' : stage === 'semi' ? 'SEMIFINALI' : stage}
+                        </div>
                         
-                        // Determina colori e testo del badge in base alla finale
-                        let badgeBg = "bg-cyan-500"; let badgeShadow = "shadow-[0_0_8px_rgba(6,182,212,0.6)]"; let badgeText = `MATCH ${game.bracket_code}`;
-                        if (game.bracket_code === 'F1') { badgeBg = "bg-yellow-400"; badgeShadow = "shadow-[0_0_10px_rgba(250,204,21,0.6)]"; badgeText = "🏆 1°/2° POSTO"; }
-                        else if (game.bracket_code === 'F3') { badgeBg = "bg-orange-500 text-white"; badgeShadow = "shadow-[0_0_10px_rgba(249,115,22,0.6)]"; badgeText = "🥉 3°/4° POSTO"; }
+                        {stageGames.map((game) => {
+                          if(game.is_event) return null; 
+                          
+                          // Colori specifici per le due Finali
+                          let badgeBg = "bg-cyan-500"; let badgeShadow = "shadow-[0_0_8px_rgba(6,182,212,0.6)]"; let badgeText = `MATCH ${game.bracket_code}`;
+                          if (game.bracket_code === 'F1') { badgeBg = "bg-yellow-400"; badgeShadow = "shadow-[0_0_10px_rgba(250,204,21,0.6)]"; badgeText = "🏆 1°/2° POSTO"; }
+                          else if (game.bracket_code === 'F3') { badgeBg = "bg-orange-500 text-white"; badgeShadow = "shadow-[0_0_10px_rgba(249,115,22,0.6)]"; badgeText = "🥉 3°/4° POSTO"; }
 
-                        return (
-                          <div key={game.id} className={`bg-[#110524]/90 backdrop-blur-md border rounded-xl p-4 flex flex-col justify-between relative ${game.bracket_code === 'F1' ? 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.3)]' : 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]'}`}>
-                            <div className={`absolute top-0 left-0 ${badgeBg} text-[#090214] font-black text-[8px] px-2 py-1 rounded-br-lg rounded-tl-[10px] uppercase ${badgeShadow}`}>{badgeText}</div>
-                            <div className={`absolute top-0 right-0 bg-[#1a0833] border-b border-l text-purple-300 font-black text-[8px] px-2 py-1 rounded-bl-lg rounded-tr-[10px] uppercase ${game.bracket_code === 'F1' ? 'border-yellow-400/50' : 'border-cyan-500/30'}`}>{game.match_time} | C.{game.court}</div>
-                            
-                            <div className="mt-4 flex justify-between items-center w-full">
-                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.home_team ? 'text-purple-100' : 'text-purple-500 italic'}`}>
-                                {renderTeamName(game.home_team, game.bracket_code, true)}
-                              </span>
-                              <span className={`text-2xl font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.home_team ? 'text-white' : 'text-[#3d135e]'}`}>{game.home_score}</span>
+                          return (
+                            <div key={game.id} className="relative w-full">
+                              {/* Trattini del Bracket (Destra e Sinistra) */}
+                              {stage !== 'finali' && <div className="absolute top-1/2 -right-5 w-5 h-[2px] bg-cyan-500/50 z-0"></div>}
+                              {stage !== 'ottavi' && <div className="absolute top-1/2 -left-5 w-5 h-[2px] bg-cyan-500/50 z-0"></div>}
+
+                              <div className={`bg-[#110524]/95 backdrop-blur-md border rounded-xl p-4 flex flex-col justify-center min-h-[90px] relative z-10 ${game.bracket_code === 'F1' ? 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.4)]' : 'border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]'}`}>
+                                <div className={`absolute top-0 left-0 ${badgeBg} text-[#090214] font-black text-[8px] px-2 py-1 rounded-br-lg rounded-tl-[10px] uppercase ${badgeShadow}`}>{badgeText}</div>
+                                <div className={`absolute top-0 right-0 bg-[#1a0833] border-b border-l text-purple-300 font-black text-[8px] px-2 py-1 rounded-bl-lg rounded-tr-[10px] uppercase ${game.bracket_code === 'F1' ? 'border-yellow-400/50' : 'border-cyan-500/30'}`}>{game.match_time} | C.{game.court}</div>
+                                
+                                <div className="mt-3 flex justify-between items-center w-full">
+                                  <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.home_team ? 'text-purple-100' : 'text-purple-500 italic'}`}>
+                                    {renderTeamName(game.home_team, game.bracket_code, true)}
+                                  </span>
+                                  <span className={`text-2xl font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.home_team ? 'text-white' : 'text-[#3d135e]'}`}>{game.home_score}</span>
+                                </div>
+                                
+                                <div className="w-full h-px bg-gradient-to-r from-transparent via-[#3d135e] to-transparent my-2 relative">
+                                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#110524] px-2 text-[9px] font-black text-pink-500 italic drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]">VS</span>
+                                </div>
+                                
+                                <div className="flex justify-between items-center w-full">
+                                  <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.away_team ? 'text-purple-100' : 'text-purple-500 italic'}`}>
+                                    {renderTeamName(game.away_team, game.bracket_code, false)}
+                                  </span>
+                                  <span className={`text-2xl font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.away_team ? 'text-white' : 'text-[#3d135e]'}`}>{game.away_score}</span>
+                                </div>
+                              </div>
                             </div>
-                            
-                            <div className="w-full h-px bg-gradient-to-r from-transparent via-[#3d135e] to-transparent my-3 relative">
-                              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#110524] px-2 text-[9px] font-black text-pink-500 italic drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]">VS</span>
-                            </div>
-                            
-                            <div className="flex justify-between items-center w-full">
-                              <span className={`text-[11px] font-black uppercase leading-tight break-words w-2/3 ${game.away_team ? 'text-purple-100' : 'text-purple-500 italic'}`}>
-                                {renderTeamName(game.away_team, game.bracket_code, false)}
-                              </span>
-                              <span className={`text-2xl font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] ${game.away_team ? 'text-white' : 'text-[#3d135e]'}`}>{game.away_score}</span>
-                            </div>
-                          </div>
-                        )
-                      })}
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+
+                  {/* 🏆 COLONNA AGGIUNTIVA: IL PODIO 🏆 */}
+                  <div className="w-[300px] flex flex-col justify-center relative pl-10 border-l-2 border-dashed border-pink-500/30 ml-6">
+                    <div className="absolute top-[5%] left-0 w-full text-center text-yellow-400 font-black uppercase tracking-[0.3em] text-lg drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]">
+                      PODIO UFFICIALE
                     </div>
-                  )
-                })}
+
+                    {(() => {
+                      const f1 = sortedGames.find(g => g.bracket_code === 'F1' && g.status === 'finita');
+                      const f3 = sortedGames.find(g => g.bracket_code === 'F3' && g.status === 'finita');
+                      
+                      let p1 = null, p2 = null, p3 = null;
+                      
+                      if (f1) {
+                        const h_won = f1.home_score > f1.away_score;
+                        p1 = h_won ? f1.home_team : f1.away_team;
+                        p2 = h_won ? f1.away_team : f1.home_team;
+                      }
+                      if (f3) {
+                        const h_won = f3.home_score > f3.away_score;
+                        p3 = h_won ? f3.home_team : f3.away_team;
+                      }
+
+                      if (!p1 && !p2 && !p3) return (
+                        <div className="text-center text-purple-500/50 font-black uppercase tracking-widest text-sm border border-[#3d135e] bg-[#110524]/50 p-6 rounded-xl">
+                          In attesa delle finali...
+                        </div>
+                      );
+
+                      return (
+                        <div className="flex flex-col gap-6 w-full">
+                          {p1 && (
+                            <div className="bg-gradient-to-br from-yellow-500/20 to-[#090214] border-2 border-yellow-400 rounded-xl p-6 text-center shadow-[0_0_30px_rgba(250,204,21,0.3)] relative transform hover:scale-105 transition-transform cursor-default">
+                              <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-5xl drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">👑</span>
+                              <h4 className="text-yellow-400 font-black text-[10px] uppercase tracking-widest mt-2">1° Classificato</h4>
+                              <p className="text-white font-black text-2xl uppercase mt-1 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">{p1.name}</p>
+                            </div>
+                          )}
+                          {p2 && (
+                            <div className="bg-gradient-to-br from-gray-400/20 to-[#090214] border-2 border-gray-400 rounded-xl p-5 text-center shadow-[0_0_20px_rgba(156,163,175,0.3)] relative">
+                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_10px_rgba(156,163,175,0.8)]">🥈</span>
+                              <h4 className="text-gray-400 font-black text-[10px] uppercase tracking-widest mt-1">2° Classificato</h4>
+                              <p className="text-white font-black text-xl uppercase mt-1">{p2.name}</p>
+                            </div>
+                          )}
+                          {p3 && (
+                            <div className="bg-gradient-to-br from-orange-600/20 to-[#090214] border-2 border-orange-500 rounded-xl p-4 text-center shadow-[0_0_20px_rgba(249,115,22,0.3)] relative">
+                              <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]">🥉</span>
+                              <h4 className="text-orange-500 font-black text-[10px] uppercase tracking-widest mt-1">3° Classificato</h4>
+                              <p className="text-white font-black text-lg uppercase mt-1">{p3.name}</p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                </div>
               </div>
             )}
           </section>
         )}
+
 {/* --- SOCIAL PUBBLICO --- */}
         {activeTab === 'social' && (
           <section className="animate-fade-in pt-4 relative z-10 space-y-6">
