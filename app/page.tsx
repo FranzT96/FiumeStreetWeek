@@ -425,9 +425,16 @@ export default function Home() {
   // --- LOGICA 3-POINT CONTEST ---
   const add3PtPlayer = async () => {
     if (!new3PtName) return;
-    await supabase.from('three_point_contest').insert({ name: new3PtName.toUpperCase(), stage: 'qualifiche' });
-    setNew3PtName('');
-    fetchData();
+    
+    const { error } = await supabase.from('three_point_contest').insert({ name: new3PtName.toUpperCase(), stage: 'qualifiche' });
+    
+    if (error) {
+      alert("Errore DB: " + error.message);
+      console.error(error);
+    } else {
+      setNew3PtName('');
+      fetchData();
+    }
   };
 
   const save3PtPlayer = async () => {
