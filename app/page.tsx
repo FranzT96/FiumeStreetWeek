@@ -717,88 +717,94 @@ export default function Home() {
 
         {/* --- HOME TAB --- */}
         {activeTab === 'home' && (
-          <section className="animate-fade-in space-y-8 relative z-10">
+          <section className="animate-fade-in space-y-8 relative z-10 flex flex-col justify-center min-h-[60vh]">
             
-            {/* 🏆 BANNER CAMPIONI 3VS3 (Visibile solo a fine torneo) */}
+            {/* 🏆 BANNER CAMPIONI 3VS3 (Riempie lo schermo se il torneo è finito) */}
             {tournamentChampion && (
-              <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-6 text-center shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden animate-fade-in">
+              <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-3xl p-10 text-center shadow-[0_0_60px_rgba(250,204,21,0.5)] relative overflow-hidden animate-fade-in my-auto">
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
-                <span className="text-6xl block mb-2 drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
-                <h3 className="text-cyan-400 font-black uppercase text-xs tracking-widest mb-1">CAMPIONI FSW 2026</h3>
-                <p className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-2">
+                <span className="text-8xl block mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
+                <h3 className="text-cyan-400 font-black uppercase text-sm tracking-widest mb-2">CAMPIONI FSW 2026</h3>
+                <p className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] mb-6">
                   {tournamentChampion.name}
                 </p>
+                <p className="text-yellow-400 font-black uppercase text-[10px] tracking-widest animate-pulse">Il torneo è concluso!</p>
               </div>
             )}
 
-            <div>
-              <h2 className="text-xl font-black uppercase flex items-center gap-2 border-b-2 border-[#3d135e] pb-2 italic mb-4 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-400">
-                <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,1)]"></span> Live Now
-              </h2>
-              <div className={`grid gap-4 ${liveGames.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
-                {liveGames.length === 0 ? (
-                  <p className="text-purple-400 font-black uppercase text-[10px] italic tracking-widest bg-[#110524]/80 backdrop-blur-md p-6 rounded-xl border border-[#3d135e]">Nessun match in corso...</p>
-                ) : liveGames.map(game => {
-                  if (game.is_event) {
-                    return (
-                      <div key={game.id} className="bg-gradient-to-br from-[#2a063b] to-[#120322] border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[0_0_20px_rgba(236,72,153,0.4)] overflow-hidden min-h-[120px]">
-                        <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
-                        <span className="text-3xl mb-2 animate-pulse drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">🔥</span>
-                        <p className="text-[14px] text-white font-black uppercase leading-tight text-center tracking-widest px-4">{game.event_description}</p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={game.id} className="bg-[#110524]/90 backdrop-blur-lg border-2 border-cyan-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[0_0_20px_rgba(6,182,212,0.4)] overflow-hidden">
-                      <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
-                      <div className="flex flex-col justify-between text-center w-[40%] mt-4">
-                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.home_team?.name || 'TBD'}</p>
-                        <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.home_score}</p>
-                      </div>
-                      <div className="flex flex-col justify-center text-center w-[20%] mt-4"><span className="text-pink-500 font-black italic animate-pulse drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">VS</span></div>
-                      <div className="flex flex-col justify-between text-center w-[40%] mt-4">
-                        <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.away_team?.name || 'TBD'}</p>
-                        <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.away_score}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {nextGames.length > 0 && (
-              <div>
-                <h2 className="text-lg font-black text-purple-300 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossimi Eventi</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {nextGames.map(game => {
-                    if (game.is_event) {
+            {/* 🔥 SEZIONE LIVE (Nascosta a torneo finito) */}
+            {!tournamentChampion && (
+              <>
+                <div>
+                  <h2 className="text-xl font-black uppercase flex items-center gap-2 border-b-2 border-[#3d135e] pb-2 italic mb-4 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-400">
+                    <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,1)]"></span> Live Now
+                  </h2>
+                  <div className={`grid gap-4 ${liveGames.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                    {liveGames.length === 0 ? (
+                      <p className="text-purple-400 font-black uppercase text-[10px] italic tracking-widest bg-[#110524]/80 backdrop-blur-md p-6 rounded-xl border border-[#3d135e]">Nessun match in corso...</p>
+                    ) : liveGames.map(game => {
+                      if (game.is_event) {
+                        return (
+                          <div key={game.id} className="bg-gradient-to-br from-[#2a063b] to-[#120322] border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[0_0_20px_rgba(236,72,153,0.4)] overflow-hidden min-h-[120px]">
+                            <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
+                            <span className="text-3xl mb-2 animate-pulse drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">🔥</span>
+                            <p className="text-[14px] text-white font-black uppercase leading-tight text-center tracking-widest px-4">{game.event_description}</p>
+                          </div>
+                        );
+                      }
                       return (
-                        <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 bg-[#1a0833]/80 backdrop-blur-sm border border-pink-500/50 rounded-xl p-3 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
-                          <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
-                          <div className="text-center font-black text-pink-300 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                          <div className="flex justify-end pr-1"><span className="bg-pink-600 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
+                        <div key={game.id} className="bg-[#110524]/90 backdrop-blur-lg border-2 border-cyan-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[0_0_20px_rgba(6,182,212,0.4)] overflow-hidden">
+                          <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
+                          <div className="flex flex-col justify-between text-center w-[40%] mt-4">
+                            <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.home_team?.name || 'TBD'}</p>
+                            <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.home_score}</p>
+                          </div>
+                          <div className="flex flex-col justify-center text-center w-[20%] mt-4"><span className="text-pink-500 font-black italic animate-pulse drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">VS</span></div>
+                          <div className="flex flex-col justify-between text-center w-[40%] mt-4">
+                            <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.away_team?.name || 'TBD'}</p>
+                            <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.away_score}</p>
+                          </div>
                         </div>
                       );
-                    }
-                    return (
-                      <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 bg-[#110524]/60 backdrop-blur-sm border border-[#3d135e] rounded-xl p-3 shadow-lg">
-                        <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
-                        <div className="text-right font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
-                        <div className="text-center text-purple-500 font-black italic text-[10px] px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
-                        <div className="text-left font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                        <div className="flex justify-end pr-1"><span className="bg-cyan-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(6,182,212,0.6)]">{game.court}</span></div>
-                      </div>
-                    );
-                  })}
+                    })}
+                  </div>
                 </div>
-              </div>
+
+                {nextGames.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-black text-purple-300 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossimi Eventi</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {nextGames.map(game => {
+                        if (game.is_event) {
+                          return (
+                            <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 bg-[#1a0833]/80 backdrop-blur-sm border border-pink-500/50 rounded-xl p-3 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
+                              <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
+                              <div className="text-center font-black text-pink-300 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
+                              <div className="flex justify-end pr-1"><span className="bg-pink-600 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 bg-[#110524]/60 backdrop-blur-sm border border-[#3d135e] rounded-xl p-3 shadow-lg">
+                            <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
+                            <div className="text-right font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                            <div className="text-center text-purple-500 font-black italic text-[10px] px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
+                            <div className="text-left font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                            <div className="flex justify-end pr-1"><span className="bg-cyan-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(6,182,212,0.6)]">{game.court}</span></div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}
 
         {/* --- GIRONI TAB --- */}
         {activeTab === 'gironi' && (
-          <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+          <section className="animate-fade-in pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10 pb-32">
             {groups.map((group) => (
               <div key={group} className="bg-[#110524]/80 backdrop-blur-lg rounded-2xl border border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] overflow-hidden">
                 <div className="bg-cyan-500 text-[#090214] p-2 text-center shadow-[0_0_15px_rgba(6,182,212,0.5)]"><h3 className="text-xl font-black uppercase italic">GIRONE {group}</h3></div>
@@ -840,7 +846,7 @@ export default function Home() {
 
         {/* --- RISULTATI PUBBLICO  --- */}
         {activeTab === 'calendario' && (
-          <section className="animate-fade-in space-y-4 pt-4 relative z-10">
+          <section className="animate-fade-in space-y-4 pt-4 relative z-10 pb-32">
             
             {/* NUOVI TAB PRINCIPALI: 3VS3, 3-PT, KOTC */}
             <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] shadow-lg overflow-x-auto hide-scrollbar">
@@ -1465,7 +1471,8 @@ export default function Home() {
                                <p className="text-[12px] font-black uppercase text-pink-400 tracking-widest drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">{game.event_description}</p>
                              </div>
                              <div className="flex justify-center px-1">
-                               {game.status === 'programmata' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-[#090214] text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-all hover:shadow-[0_0_15px_rgba(6,182,212,0.8)] ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : 'shadow-[0_0_10px_rgba(6,182,212,0.5)]'}`}>Avvia Evento</button>}
+                               {game.status === 'programmata' && game.event_description?.toUpperCase() !== 'PREMIAZIONI' && <button onClick={() => updateStatus(game.id, 'in_corso')} disabled={activeLiveGamesCount >= 2} className={`bg-cyan-500 text-[#090214] text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest transition-all hover:shadow-[0_0_15px_rgba(6,182,212,0.8)] ${activeLiveGamesCount >= 2 ? 'opacity-30 cursor-not-allowed' : 'shadow-[0_0_10px_rgba(6,182,212,0.5)]'}`}>Avvia Evento</button>}
+                               {game.status === 'programmata' && game.event_description?.toUpperCase() === 'PREMIAZIONI' && <span className="text-yellow-400/80 text-[10px] font-black uppercase tracking-widest block py-2">Solo in Calendario</span>}
                                {game.status === 'in_corso' && <button onClick={() => updateStatus(game.id, 'finita')} className="bg-pink-600 text-white text-[9px] font-black px-6 py-2 rounded-md uppercase tracking-widest shadow-[0_0_10px_rgba(236,72,153,0.6)]">Chiudi Evento</button>}
                                {game.status === 'finita' && <span className="text-purple-500 text-[10px] font-black uppercase tracking-widest block">Evento Terminato</span>}
                              </div>
