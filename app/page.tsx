@@ -195,7 +195,7 @@ export default function Home() {
         setLoading(true); 
         
         // 1. Reset Torneo Base
-        await supabase.from('games').delete().neq('stage', 'girone'); 
+        await supabase.from('games').update({ home_team_id: null, away_team_id: null, home_score: 0, away_score: 0, status: 'programmata' }).neq('stage', 'girone'); 
         await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); 
         await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); 
         
