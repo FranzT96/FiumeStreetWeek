@@ -224,9 +224,40 @@ export default function Home() {
   const sortedGames = [...games].sort((a, b) => {
     const wA = getStageWeight(a.stage); const wB = getStageWeight(b.stage);
     if (wA !== wB) return wA - wB; 
-    if (a.match_time !== b.match_time) return a.match_time.localeCompare(b.match_time);
+    
+    // Aggiunto ": string" a t per far felice TypeScript
+    const getMinutes = (t: string) => {
+      if (!t) return 0;
+      const [h, m] = t.split(':').map(Number);
+      return (h < 6 ? h + 24 : h) * 60 + m; 
+    };
+    
+    const tA = getMinutes(a.match_time);
+    const tB = getMinutes(b.match_time);
+    
+    if (tA !== tB) return tA - tB;
     return a.court.localeCompare(b.court);
   });
+
+  // --- GENERATORE DI TITOLI PER LE FINALI ---
+  const renderStageHeader = (g: any, index: number, array: any[]) => {
+    const prev = array[index - 1];
+    let header = null;
+
+    if (g.stage === 'ottavi' && (!prev || prev.stage !== 'ottavi')) header = "🔥 OTTAVI DI FINALE";
+    if (g.stage === 'quarti' && (!prev || prev.stage !== 'quarti')) header = "⚡ QUARTI DI FINALE";
+    if (g.stage === 'semi' && (!prev || prev.stage !== 'semi')) header = "💥 SEMIFINALI";
+    if (g.bracket_code === 'F3') header = "🥉 FINALE 3°/4° POSTO";
+    if (g.bracket_code === 'F1') header = "🏆 FINALISSIMA 1°/2° POSTO";
+
+    if (!header) return null;
+
+    return (
+      <div className="w-full text-center py-3 mt-8 mb-4 bg-gradient-to-r from-transparent via-[#3d135e]/80 to-transparent border-y border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
+        <span className="text-yellow-400 font-black uppercase tracking-[0.3em] text-[13px] drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]">{header}</span>
+      </div>
+    );
+  };
 
   const adminLiveGames = [ ...sortedGames.filter(g => g.status === 'in_corso'), ...sortedGames.filter(g => g.status === 'programmata'), ...sortedGames.filter(g => g.status === 'finita') ];
 
@@ -809,26 +840,30 @@ export default function Home() {
 
                     if (displayList.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun risultato disponibile.</div>;
 
-                    return displayList.map((game, i) => {
-                      if (game.is_event) return null; // Togliamo gli eventi (come i contest) da questa lista 3vs3
+                    return displayList.map((game, i, array) => {
+                      if (game.is_event) return null;
 
                       return (
-                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
-                          <div className="font-mono font-black text-cyan-400 text-[10px] drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</div>
-                          <div className="text-right font-black text-purple-100 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                        <div key={game.id} className="w-full flex flex-col">
+                          {renderStageHeader(game, i, array)}
                           
-                          <div className="flex justify-center items-center px-1 min-w-[35px]">
-                            {game.status === 'finita' ? (
-                              <div className="bg-[#1a0833] border border-cyan-500/50 px-2 py-1 rounded text-cyan-300 font-black text-[12px] shadow-[0_0_8px_rgba(6,182,212,0.4)] whitespace-nowrap">{game.home_score} - {game.away_score}</div>
-                            ) : game.status === 'in_corso' ? (
-                              <div className="bg-pink-600 border border-pink-400 px-2 py-0.5 rounded text-white font-black text-[9px] shadow-[0_0_8px_rgba(236,72,153,0.8)] animate-pulse">LIVE</div>
-                            ) : (
-                              <div className="text-purple-500 font-black italic text-[9px] drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
-                            )}
+                          <div className={`grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 p-3 ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
+                            <div className="font-mono font-black text-cyan-400 text-[10px] drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</div>
+                            <div className="text-right font-black text-purple-100 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                            
+                            <div className="flex justify-center items-center px-1 min-w-[35px]">
+                              {game.status === 'finita' ? (
+                                <div className="bg-[#1a0833] border border-cyan-500/50 px-2 py-1 rounded text-cyan-300 font-black text-[12px] shadow-[0_0_8px_rgba(6,182,212,0.4)] whitespace-nowrap">{game.home_score} - {game.away_score}</div>
+                              ) : game.status === 'in_corso' ? (
+                                <div className="bg-pink-600 border border-pink-400 px-2 py-0.5 rounded text-white font-black text-[9px] shadow-[0_0_8px_rgba(236,72,153,0.8)] animate-pulse">LIVE</div>
+                              ) : (
+                                <div className="text-purple-500 font-black italic text-[9px] drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
+                              )}
+                            </div>
+                            
+                            <div className="text-left font-black text-purple-100 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                            <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(250,204,21,0.6)]">{game.court}</span></div>
                           </div>
-                          
-                          <div className="text-left font-black text-purple-100 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                          <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(250,204,21,0.6)]">{game.court}</span></div>
                         </div>
                       );
                     });
@@ -1336,30 +1371,36 @@ export default function Home() {
 
                     if (displayList.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun elemento in calendario.</div>;
 
-                    return displayList.map((game, i) => {
+                    return displayList.map((game, i, array) => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className="grid grid-cols-[45px_1fr_40px_30px] items-center gap-2 p-3 hover:bg-[#1a0833]/80 transition-colors bg-gradient-to-r from-[#2a063b] to-[#1a0525] border-b border-[#3d135e]">
-                            <span className="font-mono text-yellow-400 text-[10px] font-black drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]">{game.match_time}</span>
-                            <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words px-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.3)]">{game.event_description}</span>
-                            <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_5px_rgba(236,72,153,0.5)]">{game.court}</span></div>
-                            <button onClick={() => setGameToEdit({ ...game })} className="text-purple-400 hover:text-cyan-400 p-2 text-right transition-colors drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button>
+                          <div key={game.id} className="w-full flex flex-col">
+                            {renderStageHeader(game, i, array)}
+                            <div className="grid grid-cols-[45px_1fr_40px_30px] items-center gap-2 p-3 hover:bg-[#1a0833]/80 transition-colors bg-gradient-to-r from-[#2a063b] to-[#1a0525] border-b border-[#3d135e]">
+                              <span className="font-mono text-yellow-400 text-[10px] font-black drop-shadow-[0_0_3px_rgba(250,204,21,0.5)]">{game.match_time}</span>
+                              <span className="text-[11px] font-black uppercase text-pink-400 text-center tracking-widest break-words px-2 drop-shadow-[0_0_5px_rgba(236,72,153,0.3)]">{game.event_description}</span>
+                              <div className="flex justify-end pr-1"><span className="bg-pink-500 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_5px_rgba(236,72,153,0.5)]">{game.court}</span></div>
+                              <button onClick={() => setGameToEdit({ ...game })} className="text-purple-400 hover:text-cyan-400 p-2 text-right transition-colors drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button>
+                            </div>
                           </div>
                         );
                       }
 
                       return (
-                        <div key={game.id} className={`grid grid-cols-[45px_1fr_auto_1fr_40px_30px] items-center gap-1 p-3 hover:bg-[#1a0833]/80 transition-colors ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
-                          <span className="font-mono text-cyan-400 text-[10px] font-black drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</span>
-                          <span className="text-[10px] font-black uppercase text-purple-100 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
-                          <span className="text-[8px] text-purple-500 italic font-black px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</span>
-                          <span className="text-[10px] font-black uppercase text-purple-100 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
-                          <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_5px_rgba(250,204,21,0.5)]">{game.court}</span></div>
-                          {game.id.toString().startsWith('d') ? (
-                            <span className="w-8"></span> 
-                          ) : (
-                            <button onClick={() => setGameToEdit({ ...game })} className="text-purple-400 hover:text-cyan-400 p-2 text-right transition-colors drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button>
-                          )}
+                        <div key={game.id} className="w-full flex flex-col">
+                          {renderStageHeader(game, i, array)}
+                          <div className={`grid grid-cols-[45px_1fr_auto_1fr_40px_30px] items-center gap-1 p-3 hover:bg-[#1a0833]/80 transition-colors ${i !== displayList.length - 1 ? 'border-b border-[#3d135e]' : ''}`}>
+                            <span className="font-mono text-cyan-400 text-[10px] font-black drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">{game.match_time}</span>
+                            <span className="text-[10px] font-black uppercase text-purple-100 text-right leading-tight break-words tracking-tighter">{game.home_team?.name || 'TBD'}</span>
+                            <span className="text-[8px] text-purple-500 italic font-black px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</span>
+                            <span className="text-[10px] font-black uppercase text-purple-100 text-left leading-tight break-words tracking-tighter">{game.away_team?.name || 'TBD'}</span>
+                            <div className="flex justify-end pr-1"><span className="bg-gradient-to-br from-yellow-400 to-orange-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_5px_rgba(250,204,21,0.5)]">{game.court}</span></div>
+                            {game.id.toString().startsWith('d') ? (
+                              <span className="w-8"></span> 
+                            ) : (
+                              <button onClick={() => setGameToEdit({ ...game })} className="text-purple-400 hover:text-cyan-400 p-2 text-right transition-colors drop-shadow-[0_0_3px_rgba(6,182,212,0.5)]">✏️</button>
+                            )}
+                          </div>
                         </div>
                       );
                     });
