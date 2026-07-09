@@ -185,8 +185,35 @@ export default function Home() {
   };
 
   const resetTournament = () => {
-    setModal({ isOpen: true, title: "⚠️ ATTENZIONE", message: "Sei sicuro? Verranno azzerati i gironi, i Playoff, le classifiche e i dati del 3-Point Contest. I roster delle squadre rimarranno intatti.", type: 'confirm', onConfirm: async () => { closeModal(); setLoading(true); await supabase.from('games').delete().neq('stage', 'girone'); await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); await supabase.from('three_point_contest').delete().gte('id', 0); // <--- CANCELLA TUTTI I TIRATORI DEL 3PT
-    await fetchData(); } });
+    setModal({ 
+      isOpen: true, 
+      title: "⚠️ ATTENZIONE", 
+      message: "Sei sicuro? Verranno azzerati i gironi, i Playoff e le classifiche. Per 3-Point Contest e KOTC verranno cancellate le fasi finali e azzerati i punteggi, ma gli iscritti iniziali verranno mantenuti.", 
+      type: 'confirm', 
+      onConfirm: async () => { 
+        closeModal(); 
+        setLoading(true); 
+        
+        // 1. Reset Torneo Base
+        await supabase.from('games').delete().neq('stage', 'girone'); 
+        await supabase.from('games').update({ home_score: 0, away_score: 0, status: 'programmata' }).eq('stage', 'girone'); 
+        await supabase.from('teams').update({ points: 0, wins: 0, losses: 0, pf: 0, ps: 0 }).neq('id', -1); 
+        
+        // 2. Reset 3-Point Contest (Cancella fasi avanzate, azzera punteggi qualifiche)
+        await supabase.from('three_point_contest').delete().neq('stage', 'qualifiche');
+        await supabase.from('three_point_contest').update({ score: 0, time_seconds: 999.99 }).eq('stage', 'qualifiche');
+        
+        // 3. Reset KOTC (Cancella fasi avanzate, azzera punteggi e teste di serie qualifiche)
+        await supabase.from('kotc_players').delete().neq('stage', 'qualifiche');
+        await supabase.from('kotc_players').update({ score: 0, seed: 0 }).eq('stage', 'qualifiche');
+
+        // Riporta i tab visuali alle qualifiche per non restare bloccati su schermate vuote
+        setThreePtSubTab('qualifiche');
+        setKotcSubTab('qualifiche');
+
+        await fetchData(); 
+      } 
+    });
   };
 
   const getStageWeight = (stage: string) => {
