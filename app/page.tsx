@@ -241,16 +241,28 @@ export default function Home() {
 
   // --- GENERATORE DI TITOLI PER LE FINALI ---
   const renderStageHeader = (g: any, index: number, array: any[]) => {
-    const prev = array[index - 1];
-    let header = null;
+    // 1. Gli eventi non innescano MAI un titolo sopra di loro
+    if (g.is_event) return null;
 
-    if (g.stage === 'ottavi' && (!prev || prev.stage !== 'ottavi')) header = "🔥 OTTAVI DI FINALE";
-    if (g.stage === 'quarti' && (!prev || prev.stage !== 'quarti')) header = "⚡ QUARTI DI FINALE";
-    if (g.stage === 'semi' && (!prev || prev.stage !== 'semi')) header = "💥 SEMIFINALI";
+    let header = null;
     if (g.bracket_code === 'F3') header = "🥉 FINALE 3°/4° POSTO";
-    if (g.bracket_code === 'F1') header = "🏆 FINALISSIMA 1°/2° POSTO";
+    else if (g.bracket_code === 'F1') header = "🏆 FINALISSIMA 1°/2° POSTO";
+    else if (g.stage === 'ottavi') header = "🔥 OTTAVI DI FINALE";
+    else if (g.stage === 'quarti') header = "⚡ QUARTI DI FINALE";
+    else if (g.stage === 'semi') header = "💥 SEMIFINALI";
 
     if (!header) return null;
+
+    // 2. Cerca la primissima partita VERA (non evento) che appartiene a questa fase
+    const firstGame = array.find(x => {
+       if (x.is_event) return false;
+       if (header === "🥉 FINALE 3°/4° POSTO") return x.bracket_code === 'F3';
+       if (header === "🏆 FINALISSIMA 1°/2° POSTO") return x.bracket_code === 'F1';
+       return x.stage === g.stage;
+    });
+
+    // 3. Stampa il titolo SOLO se la riga che stiamo disegnando è esattamente quella prima partita
+    if (g.id !== firstGame?.id) return null;
 
     return (
       <div className="w-full text-center py-3 mt-8 mb-4 bg-gradient-to-r from-transparent via-[#3d135e]/80 to-transparent border-y border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)]">
