@@ -46,7 +46,13 @@ export default function Home() {
   const [threePtPlayers, setThreePtPlayers] = useState<any[]>([]);
   const [threePtSubTab, setThreePtSubTab] = useState('qualifiche');
   const [new3PtName, setNew3PtName] = useState('');
-  const [editing3Pt, setEditing3Pt] = useState<any | null>(null); 
+  const [editing3Pt, setEditing3Pt] = useState<any | null>(null);
+
+  // --- STATI PER KOTC ---
+  const [kotcPlayers, setKotcPlayers] = useState<any[]>([]);
+  const [kotcSubTab, setKotcSubTab] = useState('qualifiche');
+  const [newKotcName, setNewKotcName] = useState('');
+  const [editingKotc, setEditingKotc] = useState<any | null>(null);
 
   const supabase = createClient();
   const groups = ['A', 'B', 'C', 'D'];
@@ -77,10 +83,12 @@ export default function Home() {
     const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
     const { data: tptData } = await supabase.from('three_point_contest').select('*');
+    const { data: kotcData } = await supabase.from('kotc_players').select('*'); // <--- AGGIUNTO KOTC
     
     if (teamsData) setTeams(teamsData);
     if (gamesData) setGames(gamesData);
     if (tptData) setThreePtPlayers(tptData);
+    if (kotcData) setKotcPlayers(kotcData); // <--- AGGIUNTO KOTC
 
     setLoading(false);
   };
@@ -104,9 +112,10 @@ export default function Home() {
     const channelTeams = supabase.channel('realtime-teams').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'teams' }, () => { fetchData(); }).subscribe();
     const channelPlayers = supabase.channel('realtime-players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => { fetchData(); }).subscribe();
     const channel3pt = supabase.channel('realtime-3pt').on('postgres_changes', { event: '*', schema: 'public', table: 'three_point_contest' }, () => { fetchData(); }).subscribe();
+    const channelKotc = supabase.channel('realtime-kotc').on('postgres_changes', { event: '*', schema: 'public', table: 'kotc_players' }, () => { fetchData(); }).subscribe(); // <--- AGGIUNTO KOTC
     
     return () => { 
-      supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); supabase.removeChannel(channel3pt);
+      supabase.removeChannel(channelGames); supabase.removeChannel(channelTeams); supabase.removeChannel(channelPlayers); supabase.removeChannel(channel3pt); supabase.removeChannel(channelKotc); // <--- AGGIUNTO KOTC
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -494,6 +503,105 @@ export default function Home() {
     });
   };
 
+  // --- LOGICA KING OF THE COURT (KOTC) ---
+  const addKotcPlayer = async () => {
+    if (!newKotcName) return;
+    const { error } = await supabase.from('kotc_players').insert({ name: newKotcName.toUpperCase(), stage: 'qualifiche' });
+    if (error) { alert("Errore DB: " + error.message); } else { setNewKotcName(''); fetchData(); }
+  };
+
+  const saveKotcPlayer = async () => {
+    if (!editingKotc) return;
+    await supabase.from('kotc_players').update({
+      name: editingKotc.name.toUpperCase(), score: parseInt(editingKotc.score) || 0
+    }).eq('id', editingKotc.id);
+    setEditingKotc(null); fetchData();
+  };
+
+  const deleteKotcPlayer = async (id: number) => {
+    setModal({ isOpen: true, title: "Elimina", message: "Rimuovere questo Re?", type: 'confirm', onConfirm: async () => { await supabase.from('kotc_players').delete().eq('id', id); fetchData(); closeModal(); } });
+  };
+
+  const closeKotcStage = (currentStage: string) => {
+    let title = ""; let message = "";
+    if (currentStage === 'qualifiche') { title = "CHIUDI QUALIFICHE"; message = "Passeranno in semifinale i migliori 4. Confermi?"; }
+    if (currentStage === 'semi') { title = "CHIUDI SEMIFINALI"; message = "I due vincitori andranno in finale. In caso di pareggio, passa chi si è qualificato meglio. Confermi?"; }
+    if (currentStage === 'finali') { title = "INCORONA IL RE"; message = "Il vincitore verrà eletto King Of The Court. Confermi?"; }
+
+    setModal({ isOpen: true, title, message, type: 'confirm', onConfirm: async () => {
+      closeModal(); setLoading(true);
+
+      if (currentStage === 'qualifiche') {
+        const players = kotcPlayers.filter(p => p.stage === 'qualifiche');
+        const sorted = [...players].sort((a, b) => b.score - a.score);
+        const top4 = sorted.slice(0, 4);
+        // I 4 passano e ricevono un "Seed" (Testa di Serie da 1 a 4)
+        const newEntries = top4.map((w, i) => ({ name: w.name, stage: 'semi', score: 0, seed: i + 1 }));
+        await supabase.from('kotc_players').insert(newEntries);
+        setKotcSubTab('semi');
+
+      } else if (currentStage === 'semi') {
+        const players = kotcPlayers.filter(p => p.stage === 'semi');
+        const p1 = players.find(p => p.seed === 1); const p4 = players.find(p => p.seed === 4);
+        const p2 = players.find(p => p.seed === 2); const p3 = players.find(p => p.seed === 3);
+
+        let w1 = null, w2 = null;
+        // In caso di parità, il >= fa passare chi ha il "seed" più basso (es: 1 passa al posto di 4)
+        if (p1 && p4) w1 = p1.score >= p4.score ? p1 : p4; else if (p1) w1 = p1; else w1 = p4;
+        if (p2 && p3) w2 = p2.score >= p3.score ? p2 : p3; else if (p2) w2 = p2; else w2 = p3;
+
+        const newEntries = [];
+        if(w1) newEntries.push({ name: w1.name, stage: 'finali', score: 0, seed: w1.seed });
+        if(w2) newEntries.push({ name: w2.name, stage: 'finali', score: 0, seed: w2.seed });
+
+        await supabase.from('kotc_players').insert(newEntries);
+        setKotcSubTab('finali');
+
+      } else if (currentStage === 'finali') {
+        const players = kotcPlayers.filter(p => p.stage === 'finali');
+        const sorted = [...players].sort((a, b) => b.score - a.score);
+        if (sorted.length > 0) await supabase.from('kotc_players').update({ stage: 'vincitore' }).eq('id', sorted[0].id);
+      }
+      fetchData();
+    }});
+  };
+
+  // Funzione visiva per stampare i giocatori KOTC (usata nelle qualifiche e nei match)
+  const renderKotcPlayerRow = (p: any, rankLabel: string = '', isPassing: boolean = false) => {
+    if (!p) return <div className="p-4 text-center text-purple-500 font-black text-[10px] uppercase tracking-widest border-b border-[#3d135e] last:border-0">In attesa sfidante...</div>;
+
+    return (
+      <div key={p.id} className={`p-3 border-b border-[#3d135e] last:border-0 transition-colors ${isPassing ? 'bg-yellow-900/20' : 'hover:bg-[#1a0833]/50'}`}>
+        {isAdminUnlocked && editingKotc?.id === p.id ? (
+          <div className="flex flex-col gap-3 bg-[#1a0833] p-4 rounded-xl border border-[#3d135e] shadow-inner my-2">
+            <div className="grid grid-cols-[2fr_1fr] gap-3 w-full">
+              <input className="w-full bg-[#090214] text-white p-3 rounded-lg text-[11px] font-black uppercase border border-cyan-500 outline-none shadow-[0_0_8px_rgba(6,182,212,0.2)] box-border" value={editingKotc.name} onChange={(e) => setEditingKotc({...editingKotc, name: e.target.value})} placeholder="NOME RE" />
+              <input type="number" className="w-full bg-[#090214] text-pink-400 p-3 rounded-lg text-sm font-black border border-pink-500 outline-none text-center shadow-[0_0_8px_rgba(236,72,153,0.2)] box-border" value={editingKotc.score == 0 ? '' : editingKotc.score} onChange={(e) => setEditingKotc({...editingKotc, score: e.target.value})} placeholder="PUNTI" />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-1 w-full">
+              <button onClick={saveKotcPlayer} className="w-full bg-cyan-500 text-[#090214] py-3 rounded-lg font-black text-[11px] uppercase shadow-[0_0_15px_rgba(6,182,212,0.5)] active:scale-95 transition-all">SALVA</button>
+              <button onClick={() => setEditingKotc(null)} className="w-full bg-transparent border border-purple-500/50 text-purple-300 py-3 rounded-lg font-black text-[10px] uppercase active:scale-95 transition-all">ANNULLA</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              {rankLabel && <span className={`font-black text-xs w-5 text-right ${isPassing ? 'text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]' : 'text-cyan-500'}`}>{rankLabel}</span>}
+              <span className="text-[11px] font-black uppercase text-purple-100">{p.name}</span>
+              {isAdminUnlocked && (
+                <div className="flex gap-2 ml-2">
+                  <button onClick={() => setEditingKotc({ ...p })} className="text-purple-500 hover:text-cyan-400 text-[10px]">✏️</button>
+                  <button onClick={() => deleteKotcPlayer(p.id)} className="text-purple-500 hover:text-pink-500 text-[10px]">❌</button>
+                </div>
+              )}
+            </div>
+            <span className={`text-xl font-black ${isPassing ? 'text-pink-400 drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]' : 'text-purple-300'}`}>{p.score}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // --- LOADING INIZIALE ---
   if (loading || authChecking) {
     return <div className="min-h-screen bg-gradient-to-b from-[#090214] via-[#1c053a] to-[#4a0d2a] flex items-center justify-center text-pink-500 font-black uppercase italic animate-pulse tracking-widest">Inizializzazione...</div>;
@@ -828,12 +936,118 @@ export default function Home() {
               </div>
             )}
 
-            {/* CONTENUTO KOTC (Ancora Vuoto) */}
+            {/* CONTENUTO KOTC */}
             {activeResultMainTab === 'kotc' && (
-               <div className="bg-[#110524]/60 backdrop-blur-md border border-[#3d135e] rounded-xl p-8 text-center mt-4 shadow-[0_0_15px_rgba(0,0,0,0.5)] animate-fade-in">
-                 <span className="text-3xl block mb-3 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">👑</span>
-                 <p className="text-purple-400 font-black uppercase tracking-widest text-[11px] italic">KOTC in aggiornamento...</p>
-               </div>
+              <div className="animate-fade-in">
+                
+                {/* SUB-TAB KOTC */}
+                <div className="flex gap-1 bg-[#090214]/60 backdrop-blur-sm p-1 rounded-xl border border-[#3d135e]/50 mb-6 shadow-inner overflow-x-auto hide-scrollbar">
+                  <button onClick={() => setKotcSubTab('qualifiche')} className={`flex-1 py-2 px-3 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all ${kotcSubTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Qualifiche</button>
+                  <button onClick={() => setKotcSubTab('semi')} className={`flex-1 py-2 px-3 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all ${kotcSubTab === 'semi' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Semifinali</button>
+                  <button onClick={() => setKotcSubTab('finali')} className={`flex-1 py-2 px-3 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all ${kotcSubTab === 'finali' ? 'bg-yellow-400 text-[#090214] shadow-[0_0_10px_rgba(250,204,21,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Finali</button>
+                </div>
+
+                {/* VINCITORE KOTC */}
+                {kotcSubTab === 'finali' && kotcPlayers.some(p => p.stage === 'vincitore') ? (
+                  <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-2xl p-8 text-center shadow-[0_0_40px_rgba(250,204,21,0.4)] relative overflow-hidden animate-fade-in">
+                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
+                    <span className="text-8xl block mb-2 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] animate-pulse">👑</span>
+                    <h3 className="text-pink-400 font-black uppercase text-xs tracking-widest mb-1 mt-6">IL RE DEL CAMPETTO È</h3>
+                    <p className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] mb-2 mt-2">
+                      {kotcPlayers.find(p => p.stage === 'vincitore')?.name}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* PANNELLO ADMIN KOTC */}
+                    {isAdminUnlocked && (
+                      <div className="bg-[#1a0833]/60 backdrop-blur-md border border-yellow-500/50 rounded-xl p-4 mb-6 shadow-[0_0_15px_rgba(250,204,21,0.2)]">
+                        <h3 className="text-yellow-400 font-black uppercase text-[10px] tracking-widest mb-3">Gestione {kotcSubTab}</h3>
+                        
+                        {kotcSubTab === 'qualifiche' && (
+                          <div className="flex gap-2 mb-4">
+                            <input placeholder="NOME RE" className="flex-1 bg-[#090214] text-white p-3 rounded-lg text-xs outline-none uppercase border border-[#3d135e] focus:border-yellow-400 transition-all font-black" value={newKotcName} onChange={(e) => setNewKotcName(e.target.value)} />
+                            <button onClick={addKotcPlayer} className="bg-yellow-400 text-[#090214] font-black px-5 rounded-lg text-[10px] uppercase tracking-widest shadow-[0_0_10px_rgba(250,204,21,0.5)] active:scale-95">Add</button>
+                          </div>
+                        )}
+
+                        {kotcSubTab === 'qualifiche' && (
+                          <button onClick={() => closeKotcStage('qualifiche')} className="w-full bg-[#090214] border border-yellow-500 text-yellow-400 font-black uppercase text-[10px] py-3 rounded-lg tracking-widest hover:bg-yellow-500 hover:text-[#090214] transition-all">Chiudi Qualifiche (Passano i TOP 4) ➔</button>
+                        )}
+                        {kotcSubTab === 'semi' && (
+                          <button onClick={() => closeKotcStage('semi')} className="w-full bg-[#090214] border border-yellow-500 text-yellow-400 font-black uppercase text-[10px] py-3 rounded-lg tracking-widest hover:bg-yellow-500 hover:text-[#090214] transition-all">Chiudi Semifinali (Passano i Vincitori) ➔</button>
+                        )}
+                        {kotcSubTab === 'finali' && (
+                          <button onClick={() => closeKotcStage('finali')} className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-[#090214] font-black uppercase text-xs py-4 rounded-lg tracking-widest shadow-[0_0_15px_rgba(250,204,21,0.5)] active:scale-95 transition-all">👑 INCORONA IL RE 👑</button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* VISTE KOTC PUBBLICHE */}
+                    {kotcSubTab === 'qualifiche' && (
+                      <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] animate-fade-in">
+                        <div className="flex justify-between px-3 py-2 bg-[#1a0833] border-b border-[#3d135e] text-[9px] font-black uppercase tracking-widest text-purple-400">
+                          <span>Rank & Nome</span>
+                          <span>Punti</span>
+                        </div>
+                        {(() => {
+                          const qualPlayers = kotcPlayers.filter(p => p.stage === 'qualifiche');
+                          const sorted = [...qualPlayers].sort((a,b) => b.score - a.score);
+                          if (sorted.length === 0) return <div className="p-8 text-center text-purple-400 font-black uppercase tracking-widest text-[10px]">Nessun aspirante Re in lista.</div>;
+                          // In qualifiche evidenziamo di giallo i TOP 4
+                          return sorted.map((p, index) => renderKotcPlayerRow(p, `${index + 1}.`, index < 4));
+                        })()}
+                      </div>
+                    )}
+
+                    {kotcSubTab === 'semi' && (
+                      <div className="space-y-6 animate-fade-in">
+                        {(() => {
+                          const semiPlayers = kotcPlayers.filter(p => p.stage === 'semi');
+                          // Li andiamo a cercare tramite la "testa di serie" assegnata durante le qualifiche
+                          const p1 = semiPlayers.find(p => p.seed === 1);
+                          const p4 = semiPlayers.find(p => p.seed === 4);
+                          const p2 = semiPlayers.find(p => p.seed === 2);
+                          const p3 = semiPlayers.find(p => p.seed === 3);
+
+                          return (
+                            <>
+                              <div className="bg-[#110524]/80 border border-cyan-500/50 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                                <div className="bg-cyan-900/30 text-center text-[10px] font-black uppercase text-cyan-400 py-2 border-b border-cyan-500/50">Scontro 1</div>
+                                {renderKotcPlayerRow(p1, '1°')}
+                                <div className="bg-[#090214] text-center text-[9px] font-black italic text-pink-500 py-1 drop-shadow-[0_0_3px_rgba(236,72,153,0.5)] relative z-10">VS</div>
+                                {renderKotcPlayerRow(p4, '4°')}
+                              </div>
+                              <div className="bg-[#110524]/80 border border-pink-500/50 rounded-xl overflow-hidden shadow-[0_0_15px_rgba(236,72,153,0.2)]">
+                                <div className="bg-pink-900/30 text-center text-[10px] font-black uppercase text-pink-400 py-2 border-b border-pink-500/50">Scontro 2</div>
+                                {renderKotcPlayerRow(p2, '2°')}
+                                <div className="bg-[#090214] text-center text-[9px] font-black italic text-cyan-400 py-1 drop-shadow-[0_0_3px_rgba(6,182,212,0.5)] relative z-10">VS</div>
+                                {renderKotcPlayerRow(p3, '3°')}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {kotcSubTab === 'finali' && (
+                      <div className="bg-[#110524]/80 border border-yellow-500/50 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(250,204,21,0.3)] animate-fade-in">
+                        <div className="bg-yellow-500/10 text-center text-[11px] font-black uppercase text-yellow-400 py-3 border-b border-yellow-500/50 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]">Grande Finale</div>
+                        {(() => {
+                          const finalPlayers = kotcPlayers.filter(p => p.stage === 'finali');
+                          return (
+                            <>
+                              {renderKotcPlayerRow(finalPlayers[0])}
+                              <div className="bg-[#090214] text-center text-[10px] font-black italic text-pink-500 py-2 drop-shadow-[0_0_3px_rgba(236,72,153,0.8)] relative z-10 border-y border-[#3d135e]">VS</div>
+                              {renderKotcPlayerRow(finalPlayers[1])}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
           </section>
