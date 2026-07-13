@@ -760,7 +760,16 @@ export default function Home() {
               <div className="bg-[#110524]/90 backdrop-blur-md border-4 border-yellow-400 rounded-3xl p-6 md:p-16 text-center shadow-[0_0_60px_rgba(250,204,21,0.6)] relative overflow-hidden animate-fade-in w-full h-full flex flex-col justify-center items-center">
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/30 to-transparent pointer-events-none"></div>
                 
-                <span className="text-7xl md:text-[11rem] block mb-2 md:mb-6 drop-shadow-[0_0_25px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
+                <span 
+                  className="text-7xl md:text-[11rem] block mb-2 md:mb-6 drop-shadow-[0_0_25px_rgba(250,204,21,0.8)] animate-bounce cursor-pointer relative z-20"
+                  onPointerDown={handlePointerDown}
+                  onPointerUp={handlePointerUpOrLeave}
+                  onPointerLeave={handlePointerUpOrLeave}
+                  onContextMenu={(e) => e.preventDefault()} 
+                  style={{ WebkitTouchCallout: 'none', userSelect: 'none', WebkitUserSelect: 'none' }}
+                >
+                  🏆
+                </span>
                 
                 <h3 className="text-cyan-400 font-black uppercase text-sm md:text-3xl tracking-widest mb-3 md:mb-6">CAMPIONI FSW 2026</h3>
                 
