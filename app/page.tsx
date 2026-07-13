@@ -446,8 +446,11 @@ export default function Home() {
   };
 
   const createGame = async () => {
-    if (!newGame.is_event && (!newGame.home_id || !newGame.away_id)) return;
-    if (newGame.is_event && !newGame.event_description) return;
+    // Blocco solo se è un evento ed è senza nome (per le partite, permettiamo il TBD)
+    if (newGame.is_event && !newGame.event_description) {
+      showAlert("Errore", "Inserisci il nome dell'evento.");
+      return;
+    }
 
     setIsNewGameModalOpen(false); 
     setLoading(true);
@@ -467,9 +470,13 @@ export default function Home() {
       }
     }
 
+    // Gestione sicura dei TBD: se è vuoto mettiamo null al posto di far crashare parseInt
+    const hId = newGame.home_id ? parseInt(newGame.home_id) : null;
+    const aId = newGame.away_id ? parseInt(newGame.away_id) : null;
+
     await supabase.from('games').insert({ 
-      home_team_id: newGame.is_event ? null : parseInt(newGame.home_id), 
-      away_team_id: newGame.is_event ? null : parseInt(newGame.away_id), 
+      home_team_id: newGame.is_event ? null : hId, 
+      away_team_id: newGame.is_event ? null : aId, 
       match_time: newGame.time, 
       court: newGame.court, 
       status: 'programmata', 
