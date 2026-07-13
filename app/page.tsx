@@ -897,7 +897,7 @@ export default function Home() {
             
             {/* NUOVI TAB PRINCIPALI: 3VS3, 3-PT, KOTC */}
             <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] shadow-lg overflow-x-auto hide-scrollbar">
-              <button onClick={() => setActiveResultMainTab('3vs3')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3vs3' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3VS3 & Programma</button>
+              <button onClick={() => setActiveResultMainTab('3vs3')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3vs3' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3VS3</button>
               <button onClick={() => setActiveResultMainTab('3pt')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3pt' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3-PT Contest</button>
               <button onClick={() => setActiveResultMainTab('kotc')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === 'kotc' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-[#090214] shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>KOTC</button>
             </div>
@@ -907,8 +907,8 @@ export default function Home() {
               <div className="animate-fade-in">
                 {/* SUB-TAB QUALIFICHE / FINALI */}
                 <div className="flex gap-2 bg-[#090214]/60 backdrop-blur-sm p-1 rounded-xl border border-[#3d135e]/50 mb-4 w-max mx-auto shadow-inner">
-                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`py-2 px-5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>15 Luglio (Qualifiche)</button>
-                  <button onClick={() => setActiveScheduleTab('finali')} className={`py-2 px-5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>22 Luglio (Finali)</button>
+                  <button onClick={() => setActiveScheduleTab('qualifiche')} className={`py-2 px-5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'qualifiche' ? 'bg-cyan-500 text-[#090214] shadow-[0_0_10px_rgba(6,182,212,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Qualifiche</button>
+                  <button onClick={() => setActiveScheduleTab('finali')} className={`py-2 px-5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all ${activeScheduleTab === 'finali' ? 'bg-pink-600 text-white shadow-[0_0_10px_rgba(236,72,153,0.4)]' : 'text-purple-500 hover:text-purple-300'}`}>Finali</button>
                 </div>
 
                 <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)]">
@@ -1734,7 +1734,7 @@ export default function Home() {
     </main>
 
       {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 5 O 6) CON NEON GLOW --- */}
-      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999 }} className="w-full bg-[#090214]/90 backdrop-blur-xl border-t-2 border-pink-500 shadow-[0_-15px_40px_rgba(249,115,22,0.4)] pb-[env(safe-area-inset-bottom)]">
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)' }} className="w-full bg-[#090214]/90 backdrop-blur-xl border-t-2 border-pink-500 shadow-[0_-15px_40px_rgba(249,115,22,0.4)] pb-[env(safe-area-inset-bottom)]">
         <div className={`grid ${isAdminUnlocked ? 'grid-cols-6' : 'grid-cols-5'} max-w-md mx-auto px-1 pt-2 pb-2 sm:pb-6`}>
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
@@ -1746,14 +1746,13 @@ export default function Home() {
           </button>
           <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-yellow-400 -translate-y-1 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">📅</span>
-            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Programma</span>
+            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Risultati</span>
           </button>
           <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🏆</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Playoff</span>
           </button>
           
-          {/* NUOVO TASTO SOCIAL */}
           <button onClick={() => setActiveTab('social')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'social' ? 'text-cyan-400 -translate-y-1 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">📱</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Social</span>
