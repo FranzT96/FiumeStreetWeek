@@ -274,7 +274,6 @@ export default function Home() {
   const adminLiveGames = [ ...sortedGames.filter(g => g.status === 'in_corso'), ...sortedGames.filter(g => g.status === 'programmata'), ...sortedGames.filter(g => g.status === 'finita') ];
 
   const generateBracket = async () => {
-    // Controllo: se O1 ha già una squadra assegnata, vuol dire che l'abbiamo già generato
     const o1Match = games.find(g => g.bracket_code === 'O1');
     if (o1Match && o1Match.home_team_id) {
       showAlert("Attenzione", "I Playoff sono già stati popolati! Se vuoi rigenerarli, devi prima azzerare il torneo dal menu in alto.");
@@ -282,16 +281,21 @@ export default function Home() {
     }
     
     setLoading(true);
+    
+    // Scarica i team freschi di database, assicurandosi che siano in ordine di punti/vittorie
+    const { data: latestTeams } = await supabase.from('teams').select('*').order('points', { ascending: false }).order('wins', { ascending: false });
+    
     const getTeam = (group: string, rank: number) => {
-      const gTeams = teams.filter(t => t.group_name === group);
+      if (!latestTeams) return null;
+      const gTeams = latestTeams.filter(t => t.group_name === group);
       return gTeams[rank - 1]?.id || null;
     };
+    
     const schemeMap: Record<string, string[]> = {
       'AB_CD': ['A', 'B', 'C', 'D'], 'AC_BD': ['A', 'C', 'B', 'D'], 'AD_BC': ['A', 'D', 'B', 'C']
     };
     const [g1, g2, g3, g4] = schemeMap[playoffScheme];
 
-    // Prepariamo l'inserimento dei nomi nei buchi TBD degli OTTAVI
     const updates = [
       { code: 'O1', home: getTeam(g1, 1), away: getTeam(g2, 4) },
       { code: 'O2', home: getTeam(g3, 2), away: getTeam(g4, 3) },
@@ -303,12 +307,19 @@ export default function Home() {
       { code: 'O8', home: getTeam(g2, 2), away: getTeam(g1, 3) }
     ];
 
+    let errors = 0;
     for (const u of updates) {
-      await supabase.from('games').update({ home_team_id: u.home, away_team_id: u.away }).eq('bracket_code', u.code);
+      const { error } = await supabase.from('games').update({ home_team_id: u.home || null, away_team_id: u.away || null }).eq('bracket_code', u.code);
+      if (error) errors++;
     }
 
-    fetchData();
-    showAlert("Generato!", "Le squadre sono state inserite nel tabellone dei Playoff in base alla classifica finale dei gironi!");
+    await fetchData();
+    
+    if (errors > 0) {
+      showAlert("Attenzione", "Ci sono stati dei problemi a inserire alcune partite nel tabellone.");
+    } else {
+      showAlert("Generato!", "Le squadre sono state inserite nel tabellone dei Playoff in base alla classifica finale dei gironi!");
+    }
   };
 
   const advancePlayoffTeam = async (game: any, winnerId: number, loserId: number) => {
@@ -1703,6 +1714,83 @@ export default function Home() {
           )}
         </div>
       </nav>
+{/* --- MODALE NUOVA VOCE CALENDARIO --- */}
+      {isNewGameModalOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[#090214]/90 backdrop-blur-md p-4 animate-fade-in">
+          <div className="bg-[#110524] border-2 border-cyan-500 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_30px_rgba(6,182,212,0.3)]">
+            <h3 className="text-xl font-black uppercase mb-4 text-white italic drop-shadow-[0_0_5px_rgba(255,255,255,0.3)]">
+              Nuova Voce Calendario
+            </h3>
+            
+            <div className="flex gap-2 mb-4 bg-[#090214] p-1 rounded-lg border border-[#3d135e]">
+              <button onClick={() => setNewGame({...newGame, is_event: false})} className={`flex-1 py-2 rounded font-black text-[10px] uppercase tracking-widest transition-all ${!newGame.is_event ? 'bg-cyan-500 text-[#090214]' : 'text-purple-500'}`}>Partita</button>
+              <button onClick={() => setNewGame({...newGame, is_event: true})} className={`flex-1 py-2 rounded font-black text-[10px] uppercase tracking-widest transition-all ${newGame.is_event ? 'bg-pink-600 text-white' : 'text-purple-500'}`}>Evento</button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-[10px] text-cyan-400 font-black uppercase mb-1 block">Orario</label>
+                  <input type="time" value={newGame.time} onChange={(e) => setNewGame({...newGame, time: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-sm border border-[#3d135e] outline-none focus:border-cyan-500 font-mono" />
+                </div>
+                <div className="w-24">
+                  <label className="text-[10px] text-cyan-400 font-black uppercase mb-1 block">Campo</label>
+                  <select value={newGame.court} onChange={(e) => setNewGame({...newGame, court: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-sm border border-[#3d135e] outline-none focus:border-cyan-500 font-black">
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-yellow-400 font-black uppercase mb-1 block">Fase (Stage)</label>
+                <select value={newGame.stage} onChange={(e) => setNewGame({...newGame, stage: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-[11px] uppercase border border-[#3d135e] outline-none focus:border-yellow-400 font-black">
+                  <option value="girone">Girone / Qualifiche</option>
+                  <option value="ottavi">Ottavi</option>
+                  <option value="quarti">Quarti</option>
+                  <option value="semi">Semifinali</option>
+                  <option value="finali">Finali</option>
+                </select>
+              </div>
+
+              {newGame.is_event ? (
+                <>
+                  <div>
+                    <label className="text-[10px] text-pink-400 font-black uppercase mb-1 block">Nome Evento</label>
+                    <input type="text" placeholder="Es. Gara da 3 Punti" value={newGame.event_description} onChange={(e) => setNewGame({...newGame, event_description: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-xs border border-[#3d135e] outline-none focus:border-pink-500 uppercase font-black" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-pink-400 font-black uppercase mb-1 block">Durata (min)</label>
+                    <input type="number" placeholder="Es. 15" value={newGame.event_duration} onChange={(e) => setNewGame({...newGame, event_duration: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-sm border border-[#3d135e] outline-none focus:border-pink-500 font-mono" />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-[10px] text-purple-400 font-black uppercase mb-1 block">Squadra Casa</label>
+                    <select value={newGame.home_id} onChange={(e) => setNewGame({...newGame, home_id: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-[11px] uppercase border border-[#3d135e] outline-none focus:border-cyan-500 font-black">
+                      <option value="">-- TBD --</option>
+                      {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-purple-400 font-black uppercase mb-1 block">Squadra Trasferta</label>
+                    <select value={newGame.away_id} onChange={(e) => setNewGame({...newGame, away_id: e.target.value})} className="w-full bg-[#090214] text-white p-3 rounded-lg text-[11px] uppercase border border-[#3d135e] outline-none focus:border-cyan-500 font-black">
+                      <option value="">-- TBD --</option>
+                      {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setIsNewGameModalOpen(false)} className="bg-transparent border border-purple-500/50 text-purple-300 px-4 py-3 rounded-lg font-black uppercase text-[10px] hover:bg-[#1a0833] transition-all">Annulla</button>
+              <button onClick={createGame} className="bg-cyan-500 text-[#090214] px-5 py-3 rounded-lg font-black uppercase text-[10px] shadow-[0_0_10px_rgba(6,182,212,0.6)] active:scale-95 transition-all">Crea</button>
+            </div>
+          </div>
+        </div>
+      )}
 
 {/* --- MODALE EDIT PARTITA / EVENTO --- */}
       {gameToEdit && (
