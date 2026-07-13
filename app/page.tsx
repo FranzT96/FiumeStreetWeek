@@ -80,15 +80,25 @@ export default function Home() {
   };
 
   const fetchData = async () => {
-    const { data: teamsData } = await supabase.from('teams').select('*, players(*)').order('points', { ascending: false }).order('wins', { ascending: false });
+    const { data: teamsData } = await supabase.from('teams').select('*, players(*)');
     const { data: gamesData } = await supabase.from('games').select('id, home_score, away_score, status, match_time, court, stage, bracket_code, home_team_id, away_team_id, is_event, event_description, event_duration, home_team:teams!home_team_id(name), away_team:teams!away_team_id(name)').order('match_time').order('id');
     const { data: tptData } = await supabase.from('three_point_contest').select('*');
-    const { data: kotcData } = await supabase.from('kotc_players').select('*'); // <--- AGGIUNTO KOTC
+    const { data: kotcData } = await supabase.from('kotc_players').select('*');
     
-    if (teamsData) setTeams(teamsData);
+    if (teamsData) {
+      // Ordinamento FIBA: Punti -> Differenza Canestri -> Punti Fatti
+      const sortedTeams = teamsData.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points; 
+        const diffA = a.pf - a.ps;
+        const diffB = b.pf - b.ps;
+        if (diffB !== diffA) return diffB - diffA; 
+        return b.pf - a.pf; 
+      });
+      setTeams(sortedTeams);
+    }
     if (gamesData) setGames(gamesData);
     if (tptData) setThreePtPlayers(tptData);
-    if (kotcData) setKotcPlayers(kotcData); // <--- AGGIUNTO KOTC
+    if (kotcData) setKotcPlayers(kotcData);
 
     setLoading(false);
   };
@@ -282,8 +292,15 @@ export default function Home() {
     
     setLoading(true);
     
-    // Scarica i team freschi di database, assicurandosi che siano in ordine di punti/vittorie
-    const { data: latestTeams } = await supabase.from('teams').select('*').order('points', { ascending: false }).order('wins', { ascending: false });
+    // Scarica i team freschi e li ordina con Punti -> Differenza Canestri
+    const { data: rawTeams } = await supabase.from('teams').select('*');
+    const latestTeams = rawTeams ? rawTeams.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        const diffA = a.pf - a.ps;
+        const diffB = b.pf - b.ps;
+        if (diffB !== diffA) return diffB - diffA;
+        return b.pf - a.pf;
+    }) : [];
     
     const getTeam = (group: string, rank: number) => {
       if (!latestTeams) return null;
@@ -735,18 +752,18 @@ export default function Home() {
 
         {/* --- HOME TAB --- */}
         {activeTab === 'home' && (
-          <section className="animate-fade-in space-y-8 relative z-10 flex flex-col justify-center min-h-[60vh]">
+          <section className={`animate-fade-in relative z-10 flex flex-col ${tournamentChampion ? 'justify-center min-h-[60vh] space-y-8' : 'space-y-6 md:space-y-12 mt-2 md:mt-6'}`}>
             
             {/* 🏆 BANNER CAMPIONI 3VS3 (Riempie lo schermo se il torneo è finito) */}
             {tournamentChampion && (
               <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-3xl p-10 text-center shadow-[0_0_60px_rgba(250,204,21,0.5)] relative overflow-hidden animate-fade-in my-auto">
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
                 <span className="text-8xl block mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
-                <h3 className="text-cyan-400 font-black uppercase text-sm tracking-widest mb-2">CAMPIONI FSW 2026</h3>
-                <p className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] mb-6">
+                <h3 className="text-cyan-400 font-black uppercase text-sm md:text-xl tracking-widest mb-2">CAMPIONI FSW 2026</h3>
+                <p className="text-4xl sm:text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] mb-6">
                   {tournamentChampion.name}
                 </p>
-                <p className="text-yellow-400 font-black uppercase text-[10px] tracking-widest animate-pulse">Il torneo è concluso!</p>
+                <p className="text-yellow-400 font-black uppercase text-[10px] md:text-sm tracking-widest animate-pulse">Il torneo è concluso!</p>
               </div>
             )}
 
@@ -754,33 +771,33 @@ export default function Home() {
             {!tournamentChampion && (
               <>
                 <div>
-                  <h2 className="text-xl font-black uppercase flex items-center gap-2 border-b-2 border-[#3d135e] pb-2 italic mb-4 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-400">
-                    <span className="w-3 h-3 rounded-full bg-pink-500 animate-pulse shadow-[0_0_10px_rgba(236,72,153,1)]"></span> Live Now
+                  <h2 className="text-xl md:text-3xl font-black uppercase flex items-center gap-2 md:gap-3 border-b-2 border-[#3d135e] pb-2 md:pb-4 italic mb-4 md:mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-400 drop-shadow-[0_0_5px_rgba(236,72,153,0.3)]">
+                    <span className="w-3 h-3 md:w-5 md:h-5 rounded-full bg-pink-500 animate-pulse shadow-[0_0_15px_rgba(236,72,153,1)]"></span> Live Now
                   </h2>
-                  <div className={`grid gap-4 ${liveGames.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                  <div className={`grid gap-4 md:gap-8 ${liveGames.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
                     {liveGames.length === 0 ? (
-                      <p className="text-purple-400 font-black uppercase text-[10px] italic tracking-widest bg-[#110524]/80 backdrop-blur-md p-6 rounded-xl border border-[#3d135e]">Nessun match in corso...</p>
+                      <p className="text-purple-400 font-black uppercase text-[10px] md:text-lg italic tracking-widest bg-[#110524]/80 backdrop-blur-md p-6 md:p-10 rounded-xl border border-[#3d135e]">Nessun match in corso...</p>
                     ) : liveGames.map(game => {
                       if (game.is_event) {
                         return (
-                          <div key={game.id} className="bg-gradient-to-br from-[#2a063b] to-[#120322] border-2 border-pink-500 rounded-xl p-4 flex flex-col justify-center items-center relative shadow-[0_0_20px_rgba(236,72,153,0.4)] overflow-hidden min-h-[120px]">
-                            <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
-                            <span className="text-3xl mb-2 animate-pulse drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">🔥</span>
-                            <p className="text-[14px] text-white font-black uppercase leading-tight text-center tracking-widest px-4">{game.event_description}</p>
+                          <div key={game.id} className="bg-gradient-to-br from-[#2a063b] to-[#120322] border-2 border-pink-500 rounded-xl p-4 md:p-8 flex flex-col justify-center items-center relative shadow-[0_0_20px_rgba(236,72,153,0.4)] overflow-hidden min-h-[120px] md:min-h-[220px]">
+                            <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] md:text-sm px-3 py-1.5 md:px-5 md:py-2 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
+                            <span className="text-3xl md:text-6xl mb-2 md:mb-4 animate-pulse drop-shadow-[0_0_10px_rgba(236,72,153,0.8)]">🔥</span>
+                            <p className="text-[14px] md:text-3xl text-white font-black uppercase leading-tight text-center tracking-widest px-4 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]">{game.event_description}</p>
                           </div>
                         );
                       }
                       return (
-                        <div key={game.id} className="bg-[#110524]/90 backdrop-blur-lg border-2 border-cyan-500 rounded-xl p-4 flex justify-between items-stretch relative shadow-[0_0_20px_rgba(6,182,212,0.4)] overflow-hidden">
-                          <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] px-3 py-1.5 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
-                          <div className="flex flex-col justify-between text-center w-[40%] mt-4">
-                            <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.home_team?.name || 'TBD'}</p>
-                            <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.home_score}</p>
+                        <div key={game.id} className="bg-[#110524]/90 backdrop-blur-lg border-2 border-cyan-500 rounded-xl p-4 md:p-8 flex justify-between items-stretch relative shadow-[0_0_20px_rgba(6,182,212,0.4)] overflow-hidden min-h-[120px] md:min-h-[220px]">
+                          <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-500 to-orange-500 text-[#090214] font-black text-[9px] md:text-sm px-3 py-1.5 md:px-5 md:py-2 rounded-bl-lg rounded-tr-[10px] uppercase z-10 shadow-[0_0_10px_rgba(234,179,8,0.5)]">CAMPO {game.court}</div>
+                          <div className="flex flex-col justify-between text-center w-[40%] mt-4 md:mt-6">
+                            <p className="text-[10px] md:text-lg text-cyan-400 font-black uppercase mb-1 md:mb-3 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.home_team?.name || 'TBD'}</p>
+                            <p className="text-4xl sm:text-5xl md:text-8xl font-black text-white mt-auto">{game.home_score}</p>
                           </div>
-                          <div className="flex flex-col justify-center text-center w-[20%] mt-4"><span className="text-pink-500 font-black italic animate-pulse drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">VS</span></div>
-                          <div className="flex flex-col justify-between text-center w-[40%] mt-4">
-                            <p className="text-[10px] text-cyan-400 font-black uppercase mb-1 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.away_team?.name || 'TBD'}</p>
-                            <p className="text-4xl sm:text-5xl font-black text-white mt-auto">{game.away_score}</p>
+                          <div className="flex flex-col justify-center text-center w-[20%] mt-4 md:mt-6"><span className="text-pink-500 font-black italic md:text-3xl animate-pulse drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]">VS</span></div>
+                          <div className="flex flex-col justify-between text-center w-[40%] mt-4 md:mt-6">
+                            <p className="text-[10px] md:text-lg text-cyan-400 font-black uppercase mb-1 md:mb-3 leading-tight break-words drop-shadow-[0_0_5px_rgba(6,182,212,0.8)]">{game.away_team?.name || 'TBD'}</p>
+                            <p className="text-4xl sm:text-5xl md:text-8xl font-black text-white mt-auto">{game.away_score}</p>
                           </div>
                         </div>
                       );
@@ -790,25 +807,25 @@ export default function Home() {
 
                 {nextGames.length > 0 && (
                   <div>
-                    <h2 className="text-lg font-black text-purple-300 uppercase flex items-center gap-2 mb-4 tracking-widest italic">🔜 Prossimi Eventi</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <h2 className="text-lg md:text-2xl font-black text-purple-300 uppercase flex items-center gap-2 mb-4 md:mb-6 tracking-widest italic drop-shadow-[0_0_5px_rgba(216,180,254,0.3)]">🔜 Prossimi Eventi</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                       {nextGames.map(game => {
                         if (game.is_event) {
                           return (
-                            <div key={game.id} className="grid grid-cols-[45px_1fr_40px] items-center gap-2 bg-[#1a0833]/80 backdrop-blur-sm border border-pink-500/50 rounded-xl p-3 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
-                              <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
-                              <div className="text-center font-black text-pink-300 text-[11px] uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
-                              <div className="flex justify-end pr-1"><span className="bg-pink-600 text-white font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
+                            <div key={game.id} className="grid grid-cols-[45px_1fr_40px] md:grid-cols-[80px_1fr_60px] items-center gap-2 md:gap-4 bg-[#1a0833]/80 backdrop-blur-sm border border-pink-500/50 rounded-xl p-3 md:p-5 shadow-[0_0_10px_rgba(236,72,153,0.2)]">
+                              <div className="font-mono font-black text-yellow-400 text-xs md:text-lg drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
+                              <div className="text-center font-black text-pink-300 text-[11px] md:text-lg uppercase leading-tight tracking-widest break-words">{game.event_description}</div>
+                              <div className="flex justify-end pr-1"><span className="bg-pink-600 text-white font-black text-[10px] md:text-lg w-6 h-6 md:w-10 md:h-10 flex items-center justify-center rounded-lg shadow-[0_0_8px_rgba(236,72,153,0.6)]">{game.court}</span></div>
                             </div>
                           );
                         }
                         return (
-                          <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] items-center gap-1 bg-[#110524]/60 backdrop-blur-sm border border-[#3d135e] rounded-xl p-3 shadow-lg">
-                            <div className="font-mono font-black text-yellow-400 text-xs drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
-                            <div className="text-right font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
-                            <div className="text-center text-purple-500 font-black italic text-[10px] px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
-                            <div className="text-left font-bold text-purple-200 text-[10px] uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
-                            <div className="flex justify-end pr-1"><span className="bg-cyan-500 text-[#090214] font-black text-[10px] w-6 h-6 flex items-center justify-center rounded shadow-[0_0_8px_rgba(6,182,212,0.6)]">{game.court}</span></div>
+                          <div key={game.id} className="grid grid-cols-[45px_1fr_auto_1fr_40px] md:grid-cols-[80px_1fr_auto_1fr_60px] items-center gap-1 md:gap-4 bg-[#110524]/60 backdrop-blur-sm border border-[#3d135e] rounded-xl p-3 md:p-5 shadow-lg">
+                            <div className="font-mono font-black text-yellow-400 text-xs md:text-lg drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]">{game.match_time}</div>
+                            <div className="text-right font-bold text-purple-200 text-[10px] md:text-lg uppercase leading-tight break-words pr-1">{game.home_team?.name || 'TBD'}</div>
+                            <div className="text-center text-purple-500 font-black italic text-[10px] md:text-base px-1 drop-shadow-[0_0_3px_rgba(168,85,247,0.5)]">VS</div>
+                            <div className="text-left font-bold text-purple-200 text-[10px] md:text-lg uppercase leading-tight break-words pl-1">{game.away_team?.name || 'TBD'}</div>
+                            <div className="flex justify-end pr-1"><span className="bg-cyan-500 text-[#090214] font-black text-[10px] md:text-lg w-6 h-6 md:w-10 md:h-10 flex items-center justify-center rounded-lg shadow-[0_0_8px_rgba(6,182,212,0.6)]">{game.court}</span></div>
                           </div>
                         );
                       })}
