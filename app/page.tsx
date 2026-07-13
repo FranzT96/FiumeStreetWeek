@@ -733,7 +733,7 @@ export default function Home() {
       <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         
         {/* --- LOGO CON EASTER EGG (3 SECONDI) --- */}
-        {activeTab === 'home' && (
+        {activeTab === 'home' && !tournamentChampion && (
           <div className="flex justify-center items-center mb-8 pt-4 animate-fade-in relative">
             {/* Bagliore dietro il logo per richiamare il sole/neon vaporwave */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-pink-600/30 rounded-full blur-[80px] pointer-events-none"></div>
@@ -752,18 +752,20 @@ export default function Home() {
 
         {/* --- HOME TAB --- */}
         {activeTab === 'home' && (
-          <section className={`animate-fade-in relative z-10 flex flex-col ${tournamentChampion ? 'justify-center min-h-[60vh] space-y-8' : 'space-y-6 md:space-y-12 mt-2 md:mt-6'}`}>
+          <section className={`animate-fade-in relative z-10 flex flex-col ${tournamentChampion ? 'h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] justify-center items-center' : 'space-y-6 md:space-y-12 mt-2 md:mt-6'}`}>
             
-            {/* 🏆 BANNER CAMPIONI 3VS3 (Riempie lo schermo se il torneo è finito) */}
+            {/* 🏆 BANNER CAMPIONI 3VS3 FULL SCREEN */}
             {tournamentChampion && (
-              <div className="bg-[#110524]/90 backdrop-blur-md border-2 border-yellow-400 rounded-3xl p-10 text-center shadow-[0_0_60px_rgba(250,204,21,0.5)] relative overflow-hidden animate-fade-in my-auto">
-                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/20 to-transparent pointer-events-none"></div>
-                <span className="text-8xl block mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
-                <h3 className="text-cyan-400 font-black uppercase text-sm md:text-xl tracking-widest mb-2">CAMPIONI FSW 2026</h3>
-                <p className="text-4xl sm:text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_15px_rgba(250,204,21,0.8)] mb-6">
+              <div className="bg-[#110524]/90 backdrop-blur-md border-4 border-yellow-400 rounded-3xl p-6 md:p-16 text-center shadow-[0_0_60px_rgba(250,204,21,0.6)] relative overflow-hidden animate-fade-in w-full h-full flex flex-col justify-center items-center">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-orange-500/30 to-transparent pointer-events-none"></div>
+                
+                <span className="text-7xl md:text-[11rem] block mb-2 md:mb-6 drop-shadow-[0_0_25px_rgba(250,204,21,0.8)] animate-bounce">🏆</span>
+                
+                <h3 className="text-cyan-400 font-black uppercase text-sm md:text-3xl tracking-widest mb-3 md:mb-6">CAMPIONI FSW 2026</h3>
+                
+                <p className="text-3xl sm:text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase drop-shadow-[0_0_30px_rgba(250,204,21,0.8)] leading-tight max-w-5xl break-words">
                   {tournamentChampion.name}
                 </p>
-                <p className="text-yellow-400 font-black uppercase text-[10px] md:text-sm tracking-widest animate-pulse">Il torneo è concluso!</p>
               </div>
             )}
 
