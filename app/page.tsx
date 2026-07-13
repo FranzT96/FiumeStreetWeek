@@ -16,7 +16,7 @@ export default function Home() {
   
   const [activeTab, setActiveTab] = useState('home'); 
   const [activeAdminSubTab, setActiveAdminSubTab] = useState('live'); 
-  const [activeResultMainTab, setActiveResultMainTab] = useState('3vs3'); 
+  const [activeResultMainTab, setActiveResultMainTab] = useState('programma'); 
   const [activeScheduleTab, setActiveScheduleTab] = useState('qualifiche'); 
   
   const [newGame, setNewGame] = useState({ home_id: '', away_id: '', time: '18:00', court: 'A', is_event: false, event_description: '', event_duration: '', stage: 'girone' });
@@ -895,12 +895,52 @@ export default function Home() {
         {activeTab === 'calendario' && (
           <section className="animate-fade-in space-y-4 pt-4 relative z-10 pb-32">
             
-            {/* NUOVI TAB PRINCIPALI: 3VS3, 3-PT, KOTC */}
+            {/* NUOVI TAB PRINCIPALI: PROGRAMMA, 3VS3, 3-PT, KOTC */}
             <div className="flex gap-2 bg-[#110524]/80 backdrop-blur-sm p-1.5 rounded-xl border border-[#3d135e] shadow-lg overflow-x-auto hide-scrollbar">
+              <button onClick={() => setActiveResultMainTab('programma')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === 'programma' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-[#090214] shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>Programma</button>
               <button onClick={() => setActiveResultMainTab('3vs3')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3vs3' ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3VS3</button>
-              <button onClick={() => setActiveResultMainTab('3pt')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3pt' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3-PT Contest</button>
-              <button onClick={() => setActiveResultMainTab('kotc')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === 'kotc' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-[#090214] shadow-[0_0_15px_rgba(250,204,21,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>KOTC</button>
+              <button onClick={() => setActiveResultMainTab('3pt')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === '3pt' ? 'bg-gradient-to-r from-cyan-400 to-blue-500 text-[#090214] shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>3-PT</button>
+              <button onClick={() => setActiveResultMainTab('kotc')} className={`whitespace-nowrap flex-1 py-3 px-4 rounded-lg font-black uppercase text-xs tracking-widest transition-all ${activeResultMainTab === 'kotc' ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'text-purple-400 hover:text-purple-200'}`}>KOTC</button>
             </div>
+
+            {/* CONTENUTO PROGRAMMA EVENTI */}
+            {activeResultMainTab === 'programma' && (
+              <div className="animate-fade-in">
+                <div className="bg-[#110524]/80 backdrop-blur-md border border-[#3d135e] rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(0,0,0,0.5)] p-4 md:p-6">
+                  <h3 className="text-xl md:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 uppercase italic mb-6 text-center drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">
+                    Timeline Eventi
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    {sortedGames.filter(g => g.is_event).length === 0 ? (
+                      <p className="text-center text-purple-400 font-black uppercase text-xs">Nessun evento in programma.</p>
+                    ) : (
+                      sortedGames.filter(g => g.is_event).map((event) => (
+                        <div key={event.id} className="flex items-center gap-4 bg-[#090214]/60 p-3 md:p-4 rounded-xl border border-pink-500/30 hover:border-pink-500/80 transition-colors">
+                          <div className="text-yellow-400 font-mono font-black text-lg md:text-xl w-14 shrink-0 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]">
+                            {event.match_time}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-pink-400 font-black uppercase text-sm md:text-lg leading-tight drop-shadow-[0_0_5px_rgba(236,72,153,0.5)]">
+                              {event.event_description}
+                            </div>
+                            {event.event_duration > 0 && (
+                              <div className="text-purple-400 text-[10px] md:text-xs font-bold uppercase mt-1">
+                                Durata stimata: {event.event_duration} min
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-center justify-center bg-[#1a0833] border border-cyan-500/50 w-10 h-10 md:w-14 md:h-14 rounded-lg shadow-[0_0_10px_rgba(6,182,212,0.3)] shrink-0">
+                            <span className="text-[8px] md:text-[10px] text-cyan-400 font-black uppercase">Campo</span>
+                            <span className="text-cyan-400 font-black text-sm md:text-lg leading-none">{event.court}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* CONTENUTO 3VS3 */}
             {activeResultMainTab === '3vs3' && (
@@ -1730,7 +1770,7 @@ export default function Home() {
           </button>
           <button onClick={() => setActiveTab('calendario')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'calendario' ? 'text-yellow-400 -translate-y-1 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">📅</span>
-            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Risultati</span>
+            <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Programma</span>
           </button>
           <button onClick={() => setActiveTab('playoff')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'playoff' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🏆</span>
