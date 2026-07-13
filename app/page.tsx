@@ -726,7 +726,8 @@ export default function Home() {
   const tournamentChampion = f1Game ? (f1Game.home_score > f1Game.away_score ? f1Game.home_team : f1Game.away_team) : null;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#090214] via-[#1c053a] to-[#4a0d2a] p-3 md:p-8 font-sans text-purple-200 pb-28 select-none relative">
+    <>
+    <main className="min-h-screen bg-gradient-to-b from-[#090214] via-[#1c053a] to-[#4a0d2a] p-3 md:p-8 font-sans text-purple-200 pb-28 select-none relative overflow-x-hidden">
       {/* Sfumatura tramonto fissa sul fondo dello schermo */}
       <div className="fixed bottom-0 left-0 w-full h-64 bg-gradient-to-t from-orange-600/20 via-pink-600/5 to-transparent pointer-events-none z-0"></div>
       
@@ -1705,10 +1706,11 @@ export default function Home() {
           </section>
         )}
       </div>
+    </main>
 
       {/* --- MENU BASSO DINAMICO (GRIGLIA FISSA A 5 O 6) CON NEON GLOW --- */}
-      <nav className="fixed bottom-0 left-0 w-full bg-[#090214]/80 backdrop-blur-xl border-t-2 border-pink-500 shadow-[0_-15px_40px_rgba(249,115,22,0.25)] z-[200]">
-        <div className={`grid ${isAdminUnlocked ? 'grid-cols-6' : 'grid-cols-5'} max-w-md mx-auto px-1 pt-2 pb-6`}>
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999 }} className="w-full bg-[#090214]/90 backdrop-blur-xl border-t-2 border-pink-500 shadow-[0_-15px_40px_rgba(249,115,22,0.4)] pb-[env(safe-area-inset-bottom)]">
+        <div className={`grid ${isAdminUnlocked ? 'grid-cols-6' : 'grid-cols-5'} max-w-md mx-auto px-1 pt-2 pb-2 sm:pb-6`}>
           <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center justify-center transition-all ${activeTab === 'home' ? 'text-pink-500 -translate-y-1 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'text-purple-400/50 hover:text-purple-200'}`}>
             <span className="text-xl sm:text-2xl">🔥</span>
             <span className="text-[8px] font-black uppercase italic mt-1 tracking-tight">Live</span>
@@ -1924,6 +1926,6 @@ export default function Home() {
           </div>
         </div>
       )}
-    </main>
+    </>
   );
 }
