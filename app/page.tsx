@@ -385,8 +385,15 @@ export default function Home() {
   };
 
   const updateStatus = async (gameId: number, newStatus: string) => {
+    // 1. Controllo lo stato dell'app
     const game = games.find(g => g.id === gameId);
     if (!game) return;
+
+    // 2. ANTISPAM / DOPPIO CLICK: Chiedo al DB se la partita è GIÀ stata messa in questo stato
+    const { data: dbRealGame } = await supabase.from('games').select('status').eq('id', gameId).single();
+    if (dbRealGame && dbRealGame.status === newStatus) {
+      return; // Blocca subito l'esecuzione multipla!
+    }
 
     if (newStatus === 'in_corso' && game.status !== 'in_corso') {
       const liveCount = games.filter(g => g.status === 'in_corso').length;
